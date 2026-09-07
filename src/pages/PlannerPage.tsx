@@ -131,6 +131,33 @@ export default function PlannerPage({ onNavigate }: { onNavigate: (page: string)
     setRangeCall({ type: "break", title: "Break", location: "", actorIds: [] });
   }
 
+  function addCellCall({ date, startTime, laneId, type }: { date: string; startTime: string; laneId: string; type: "break" | "lunch" }) {
+    const endTime = addMinutes(startTime, state.settings.plannerSlotMinutes);
+    setState((current) => {
+      const alreadyExists = current.plannerBlockouts.some((blockout) =>
+        blockout.date === date && blockout.startTime === startTime && blockout.endTime === endTime && !blockout.laneId && blockout.type === type
+      );
+      if (alreadyExists) return current;
+      return {
+        ...current,
+        plannerBlockouts: [...current.plannerBlockouts, {
+          id: id("call"),
+          date,
+          startTime,
+          endTime,
+          // Breaks and meal breaks are company-wide by default. They are
+          // placed from any cell, then reserve the matching time in all lanes.
+          laneId: undefined,
+          type,
+          title: type === "lunch" ? "Meal break" : "Break",
+          actorIds: current.actors.filter((actor) => actor.active).map((actor) => actor.id),
+          includeInSchedule: true,
+        }],
+      };
+    });
+    setOpenCell(null);
+  }
+
   function finderSlots() {
     if (!finderBeatId) return [];
     const dates = getWeekDates(state.settings.weekStartDate);
@@ -368,7 +395,7 @@ export default function PlannerPage({ onNavigate }: { onNavigate: (page: string)
         <label><input type="checkbox" checked={onlyNeedsRehearsal} onChange={(event) => setOnlyNeedsRehearsal(event.target.checked)} className="mr-1" />Needs rehearsal</label>
         <label><input type="checkbox" checked={onlyNotScheduled} onChange={(event) => setOnlyNotScheduled(event.target.checked)} className="mr-1" />Not scheduled this week</label>
       </div>
-      <TimeGrid state={state} showUnavailable={showUnavailable} onlyNeedsRehearsal={onlyNeedsRehearsal} onlyNotScheduled={onlyNotScheduled} openCell={openCell} setOpenCell={setOpenCell} toggleSelection={toggleSelection} onRangeSelect={(nextRange) => { setRange(nextRange); setRangeBeatIds([]); }} />
+      <TimeGrid state={state} showUnavailable={showUnavailable} onlyNeedsRehearsal={onlyNeedsRehearsal} onlyNotScheduled={onlyNotScheduled} openCell={openCell} setOpenCell={setOpenCell} toggleSelection={toggleSelection} onAddCall={addCellCall} onRangeSelect={(nextRange) => { setRange(nextRange); setRangeBeatIds([]); }} />
       {pendingBlocks && <ConflictModal blocks={pendingBlocks} onCancel={() => setPendingBlocks(null)} onProceed={() => commitBlocks(pendingBlocks)} />}
     </section>
   );

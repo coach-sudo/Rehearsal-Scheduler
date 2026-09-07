@@ -158,7 +158,10 @@ export type PrintOrientation = "portrait" | "landscape";
 export type PrintSpacing = "compact" | "comfortable" | "large";
 export type SchedulePaginationMode = "readableAuto" | "preferOnePage" | "forceTwoPages";
 export type ScheduleTextAlign = "left" | "center" | "right";
+export type ScheduleVerticalAlign = "top" | "center" | "bottom";
 export type CardTimePlacement = "top" | "leftRail";
+export type LogoPosition = "topLeft" | "topCenter" | "topRight" | "footerLeft" | "footerCenter" | "footerRight";
+export type DirectorContactPlacement = "none" | "header" | "footer";
 
 export interface ScheduleDesignSettings {
   template: ScheduleTemplate;
@@ -186,6 +189,11 @@ export interface ScheduleDesignSettings {
   headerStyle: HeaderStyle;
   headerLabel: string;
   logoDataUrl?: string;
+  logoPosition: LogoPosition;
+  logoSize: number;
+  directorName: string;
+  directorContact: string;
+  directorContactPlacement: DirectorContactPlacement;
   rehearsalNotes: string;
   emergencyContact: string;
   footerText: string;
@@ -201,6 +209,7 @@ export interface ScheduleDesignSettings {
   timeTextAlign: ScheduleTextAlign;
   workTextAlign: ScheduleTextAlign;
   actorTextAlign: ScheduleTextAlign;
+  cellContentVerticalAlign: ScheduleVerticalAlign;
   boldTimes: boolean;
   boldWork: boolean;
   boldActorNames: boolean;

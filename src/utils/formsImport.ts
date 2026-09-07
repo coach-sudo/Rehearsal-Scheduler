@@ -17,6 +17,8 @@ export interface AvailabilityColumnGuess {
   startTime?: string;
   endTime?: string;
   fromCellValues?: boolean;
+  fromRangePair?: boolean;
+  endHeader?: string;
 }
 
 const dayPatterns: Array<[DayOfWeek, RegExp]> = [
@@ -90,7 +92,7 @@ export function guessFormsImport(csvText: string, state: AppState): FormsImportG
   const nameColumn = findHeader(headers, normalized, ["full name", "actor name", "student name", "performer", "name"]) ?? headers[0] ?? "";
   const emailColumn = findHeader(headers, normalized, ["email address", "email", "e-mail"]) ?? "";
   const roleColumn = findHeader(headers, normalized, ["role", "character", "part"]) ?? "";
-  const availabilityColumns = headers
+  const inferredColumns = headers
     .flatMap((header, index) => {
       const directGuess = guessAvailabilityColumn(header, state);
       if (directGuess) return [directGuess];
@@ -98,12 +100,20 @@ export function guessFormsImport(csvText: string, state: AppState): FormsImportG
       return answerGuess ? [answerGuess] : [];
     })
     .filter((guess): guess is AvailabilityColumnGuess => Boolean(guess));
+  // When a question title names a slot and its answers also contain ranges,
+  // prefer the answers. Checkbox-grid exports commonly take this shape.
+  const availabilityColumns = inferredColumns.map((column) => {
+    const index = headers.indexOf(column.header);
+    return guessAnswerTextColumn(column.header, rows, index, state) ?? column;
+  });
+  const pairedRangeColumns = guessRangePairColumns(headers, rows, state);
+  const allAvailabilityColumns = [...availabilityColumns, ...pairedRangeColumns.filter((pair) => !availabilityColumns.some((column) => column.header === pair.header))];
   const warnings = [
     !headers.length ? "No CSV headers found." : "",
     !nameColumn ? "No actor/name column was detected." : "",
-    !availabilityColumns.length ? "No availability time-slot columns were detected. Put day and time in the question title or answer choices, such as Monday 3:00-3:30." : "",
+    !allAvailabilityColumns.length ? "No availability time-slot columns were detected. Put day and time in the question title or answer choices, such as Monday 3:00-3:30." : "",
   ].filter(Boolean);
-  return { headers, rows, nameColumn, emailColumn, roleColumn, availabilityColumns, warnings };
+  return { headers, rows, nameColumn, emailColumn, roleColumn, availabilityColumns: allAvailabilityColumns, warnings };
 }
 
 export function applyFormsImport(csvText: string, state: AppState, mapping: Pick<FormsImportGuess, "nameColumn" | "emailColumn" | "roleColumn" | "availabilityColumns">): AppState {
@@ -139,19 +149,20 @@ export function applyFormsImport(csvText: string, state: AppState, mapping: Pick
     allRoster.add(actor.id);
 
     availabilityIndexes.forEach(({ column, index }) => {
+      if (column.fromRangePair && column.dayOfWeek !== undefined && column.endHeader) {
+        const endIndex = headers.indexOf(column.endHeader);
+        const startTime = parseTimeValue(row[index] ?? "", state);
+        const endTime = parseTimeValue(row[endIndex] ?? "", state);
+        if (!startTime || !endTime || endTime <= startTime) return;
+        availabilitySlotsForRange(column.dayOfWeek, startTime, endTime, state).forEach((slot) => {
+          writeAvailabilitySlot(availability, actor.id, slot.dayOfWeek, slot.startTime, slot.endTime, true);
+        });
+        return;
+      }
+
       if (column.fromCellValues) {
         extractAvailabilityMentions(row[index], state, column.dayOfWeek).forEach((slot) => {
-          const key = `${actor.id}|${slot.dayOfWeek}|${slot.startTime}`;
-          const nextSlot: AvailabilitySlot = {
-            actorId: actor.id,
-            dayOfWeek: slot.dayOfWeek,
-            startTime: slot.startTime,
-            endTime: slot.endTime,
-            available: true,
-          };
-          const existingIndex = availability.findIndex((item) => `${item.actorId}|${item.dayOfWeek}|${item.startTime}` === key);
-          if (existingIndex >= 0) availability[existingIndex] = nextSlot;
-          else availability.push(nextSlot);
+          writeAvailabilitySlot(availability, actor.id, slot.dayOfWeek, slot.startTime, slot.endTime, true);
         });
         return;
       }
@@ -159,18 +170,8 @@ export function applyFormsImport(csvText: string, state: AppState, mapping: Pick
       if (column.dayOfWeek === undefined || !column.startTime) return;
       const status = valueToAvailability(row[index]);
       if (status === null) return;
-      const block = getAvailabilityBlockForTime(column.startTime, state.settings.availabilityBlockMinutes);
-      const key = `${actor.id}|${column.dayOfWeek}|${block.startTime}`;
-      const nextSlot: AvailabilitySlot = {
-        actorId: actor.id,
-        dayOfWeek: column.dayOfWeek,
-        startTime: block.startTime,
-        endTime: addMinutes(block.startTime, state.settings.availabilityBlockMinutes),
-        available: status,
-      };
-      const existingIndex = availability.findIndex((slot) => `${slot.actorId}|${slot.dayOfWeek}|${slot.startTime}` === key);
-      if (existingIndex >= 0) availability[existingIndex] = nextSlot;
-      else availability.push(nextSlot);
+      availabilitySlotsForRange(column.dayOfWeek, column.startTime, column.endTime ?? addMinutes(column.startTime, state.settings.availabilityBlockMinutes), state)
+        .forEach((slot) => writeAvailabilitySlot(availability, actor.id, slot.dayOfWeek, slot.startTime, slot.endTime, status));
     });
   });
 
@@ -206,13 +207,29 @@ function guessAnswerTextColumn(header: string, rows: string[][], columnIndex: nu
   return hasSlotAnswers ? { header, dayOfWeek: headerDay, fromCellValues: true } : null;
 }
 
+function guessRangePairColumns(headers: string[], rows: string[][], state: AppState): AvailabilityColumnGuess[] {
+  return dayPatterns.flatMap(([dayOfWeek, pattern]) => {
+    const dayHeaders = headers.filter((header) => pattern.test(header));
+    const startHeader = dayHeaders.find((header) => /\b(start|from|arrival)\b/i.test(header));
+    const endHeader = dayHeaders.find((header) => /\b(end|until|departure)\b/i.test(header));
+    if (!startHeader || !endHeader) return [];
+    const startIndex = headers.indexOf(startHeader);
+    const endIndex = headers.indexOf(endHeader);
+    const hasRange = rows.some((row) => {
+      const start = parseTimeValue(row[startIndex] ?? "", state);
+      const end = parseTimeValue(row[endIndex] ?? "", state);
+      return Boolean(start && end && end > start);
+    });
+    return hasRange ? [{ header: startHeader, dayOfWeek, fromRangePair: true, endHeader }] : [];
+  });
+}
+
 function extractAvailabilityMentions(value: string, state: AppState, fallbackDay?: DayOfWeek) {
   const parts = value.split(/[\n;,|]+/).map((part) => part.trim()).filter(Boolean);
   return parts.flatMap((part) => {
     const directGuess = guessAvailabilityColumn(part, state);
     if (directGuess?.dayOfWeek !== undefined && directGuess.startTime) {
-      const block = getAvailabilityBlockForTime(directGuess.startTime, state.settings.availabilityBlockMinutes);
-      return [{ dayOfWeek: directGuess.dayOfWeek, startTime: block.startTime, endTime: block.endTime }];
+      return availabilitySlotsForRange(directGuess.dayOfWeek, directGuess.startTime, directGuess.endTime ?? addMinutes(directGuess.startTime, state.settings.availabilityBlockMinutes), state);
     }
 
     if (fallbackDay === undefined) return [];
@@ -222,9 +239,30 @@ function extractAvailabilityMentions(value: string, state: AppState, fallbackDay
     const endTime = timeMatches[1]
       ? toTime(timeMatches[1][1], timeMatches[1][2], timeMatches[1][3], state)
       : addMinutes(startTime, state.settings.availabilityBlockMinutes);
-    const block = getAvailabilityBlockForTime(startTime, state.settings.availabilityBlockMinutes);
-    return [{ dayOfWeek: fallbackDay, startTime: block.startTime, endTime: endTime > block.startTime ? endTime : block.endTime }];
+    return availabilitySlotsForRange(fallbackDay, startTime, endTime > startTime ? endTime : addMinutes(startTime, state.settings.availabilityBlockMinutes), state);
   });
+}
+
+function availabilitySlotsForRange(dayOfWeek: DayOfWeek, startTime: string, endTime: string, state: AppState) {
+  const first = getAvailabilityBlockForTime(startTime, state.settings.availabilityBlockMinutes).startTime;
+  const slots: Array<{ dayOfWeek: DayOfWeek; startTime: string; endTime: string }> = [];
+  for (let cursor = first; cursor < endTime; cursor = addMinutes(cursor, state.settings.availabilityBlockMinutes)) {
+    slots.push({ dayOfWeek, startTime: cursor, endTime: addMinutes(cursor, state.settings.availabilityBlockMinutes) });
+  }
+  return slots;
+}
+
+function writeAvailabilitySlot(availability: AvailabilitySlot[], actorId: string, dayOfWeek: DayOfWeek, startTime: string, endTime: string, available: boolean) {
+  const key = `${actorId}|${dayOfWeek}|${startTime}`;
+  const nextSlot: AvailabilitySlot = { actorId, dayOfWeek, startTime, endTime, available };
+  const existingIndex = availability.findIndex((slot) => `${slot.actorId}|${slot.dayOfWeek}|${slot.startTime}` === key);
+  if (existingIndex >= 0) availability[existingIndex] = nextSlot;
+  else availability.push(nextSlot);
+}
+
+function parseTimeValue(value: string, state: AppState) {
+  const match = value.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  return match ? toTime(match[1], match[2], match[3], state) : undefined;
 }
 
 function toTime(hourText: string, minuteText = "00", meridiem: string | undefined, state: AppState) {

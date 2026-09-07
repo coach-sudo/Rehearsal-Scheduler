@@ -1,4 +1,4 @@
-import type { AppState, BeatAvailability, PlannerSelection } from "../types";
+import type { AppState, BeatAvailability, PlannerBlockout, PlannerSelection } from "../types";
 import StatusBadge from "./StatusBadge";
 import { getAvailabilityBlockForTime } from "../utils/time";
 
@@ -11,10 +11,11 @@ interface Props {
   showUnavailable: boolean;
   selections: PlannerSelection[];
   onToggle: (beatId: string) => void;
+  onAddCall: (type: Extract<PlannerBlockout["type"], "break" | "lunch">) => void;
   onClose: () => void;
 }
 
-export default function BeatPickerPopover({ state, date, startTime, laneId, options, showUnavailable, selections, onToggle, onClose }: Props) {
+export default function BeatPickerPopover({ state, date, startTime, laneId, options, showUnavailable, selections, onToggle, onAddCall, onClose }: Props) {
   const selectedIds = selections.filter((selection) => selection.date === date && selection.startTime === startTime && selection.laneId === laneId).map((selection) => selection.beatId);
   const visible = showUnavailable ? options : options.filter((option) => option.canRehearse);
   const block = getAvailabilityBlockForTime(startTime, state.settings.availabilityBlockMinutes);
@@ -41,6 +42,13 @@ export default function BeatPickerPopover({ state, date, startTime, laneId, opti
         >
           Clear slot
         </button>
+      </div>
+      <div className="mb-3 rounded border border-line bg-panel p-2">
+        <div className="mb-1 text-xs font-medium text-stone-700">Or reserve this slot</div>
+        <div className="flex gap-2">
+          <button onClick={() => onAddCall("break")} className="rounded border border-line bg-white px-2 py-1 text-xs font-medium">Break</button>
+          <button onClick={() => onAddCall("lunch")} className="rounded border border-line bg-white px-2 py-1 text-xs font-medium">Meal break</button>
+        </div>
       </div>
       <div className="max-h-72 space-y-2 overflow-auto">
         {visible.map((option) => {

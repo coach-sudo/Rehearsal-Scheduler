@@ -115,7 +115,7 @@ export default function AvailabilityPage() {
           <input value={query} onChange={(event) => setQuery(event.target.value)} className="mt-1 w-full rounded border border-line px-3 py-2" placeholder="Type a name to narrow the matrix" />
         </div>
         <div>
-          <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">Group view</label>
+          <label className="text-xs font-semibold uppercase tracking-wide text-stone-500">Saved casting group</label>
           <select value={selectedGroupId} onChange={(event) => { setSelectedGroupId(event.target.value); setFocused([]); }} className="mt-1 w-full rounded border border-line px-3 py-2">
             <option value="">All actors</option>
             {state.actorGroups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
@@ -143,10 +143,13 @@ export default function AvailabilityPage() {
       </div>
 
       <details className="mb-4 rounded-lg border border-line bg-white p-3">
-        <summary className="cursor-pointer text-sm font-medium">Focus on a group</summary>
+        <summary className="cursor-pointer text-sm font-medium">Focus on a saved group or choose individual actors</summary>
+        {state.actorGroups.length > 0 && <div className="mt-2 flex flex-wrap gap-2">
+          {state.actorGroups.map((group) => <button key={group.id} onClick={() => { setSelectedGroupId(group.id); setFocused([]); }} className={`rounded border px-2 py-1 text-sm ${selectedGroupId === group.id ? "border-ink bg-ink text-white" : "border-line bg-white"}`}>{group.name} ({group.actorIds.length})</button>)}
+        </div>}
         <div className="mt-2 flex flex-wrap gap-2">
           {state.actors.map((actor) => (
-            <label key={actor.id} className="rounded border border-line px-2 py-1 text-sm"><input className="mr-1" type="checkbox" checked={focused.includes(actor.id)} onChange={() => setFocused((current) => current.includes(actor.id) ? current.filter((id) => id !== actor.id) : [...current, actor.id])} />{actor.name}</label>
+            <label key={actor.id} className="rounded border border-line px-2 py-1 text-sm"><input className="mr-1" type="checkbox" checked={focused.includes(actor.id)} onChange={() => { setSelectedGroupId(""); setFocused((current) => current.includes(actor.id) ? current.filter((id) => id !== actor.id) : [...current, actor.id]); }} />{actor.name}</label>
           ))}
         </div>
       </details>

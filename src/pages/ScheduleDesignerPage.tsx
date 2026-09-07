@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Download, Grid3X3, Printer, Upload } from "lucide-react";
 import { useAppState } from "../App";
-import type { AppState, BlockStyle, CustomBlockLayout, FontPairing, HeaderStyle, PaperSize, PrintOrientation, PrintSpacing, ScheduledBlock, ScheduleDesignCell, ScheduleDesignPlaceholder, ScheduleDesignSettings, ScheduleTemplate, ScheduleTextAlign } from "../types";
+import type { AppState, BlockStyle, CustomBlockLayout, FontPairing, HeaderStyle, LogoPosition, PaperSize, PrintOrientation, PrintSpacing, ScheduledBlock, ScheduleDesignCell, ScheduleDesignPlaceholder, ScheduleDesignSettings, ScheduleTemplate, ScheduleTextAlign, ScheduleVerticalAlign } from "../types";
 import { actorNames, beatTitles, blockTypeColor, characterNames, dayLabel, durationLabel, fontPairings, formatScheduleTime, iconForBlock, scheduleExportHtml, scheduleTemplates, sortedBlocks } from "../utils/scheduleDesign";
 import { getTimeSlots, getWeekDates, id, timeToMinutes } from "../utils/time";
 
@@ -72,6 +72,12 @@ function customStyleForMode(mode: ScheduleDesignSettings["renderMode"]): Schedul
   if (mode === "beatCardsByDay" || mode === "runOfDayStrip") return "cards";
   if (mode === "horizontalTimeline") return "timeline";
   return "table";
+}
+
+function densityLabel(value: number) {
+  if (value < 35) return "Compact";
+  if (value > 70) return "Spacious";
+  return "Balanced";
 }
 
 export default function ScheduleDesignerPage() {
@@ -295,7 +301,7 @@ export default function ScheduleDesignerPage() {
 
           <section hidden={designerTab !== "content"} className="grid gap-3 md:grid-cols-2">
             <Panel title="Fast Tweaks">
-              <label className="block text-sm font-medium">Density <span className="text-stone-500">{design.density}</span><input type="range" min={10} max={100} value={design.density} onChange={(event) => updateDesign({ density: Number(event.target.value) })} className="mt-2 w-full" /></label>
+              <label className="block text-sm font-medium">Density <span className="text-stone-500">{densityLabel(design.density)} ({design.density})</span><input type="range" min={10} max={100} value={design.density} onChange={(event) => updateDesign({ density: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Controls grid header height, cell padding, and the amount of breathing room around details.</span></label>
               <label className="mt-3 block text-sm font-medium">Text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={16} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Changes the actual schedule preview and print size. One-page fit adapts around it.</span></label>
               <label className="mt-3 block text-sm font-medium">Font<select value={design.fontPairing} onChange={(event) => updateDesign({ fontPairing: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
               <label className="mt-3 block text-sm font-medium">Block style<select value={design.blockStyle} onChange={(event) => updateDesign({ blockStyle: event.target.value as BlockStyle })} className="mt-1 block w-full rounded border border-line px-3 py-2">{blockStyles.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}</select></label>
@@ -305,7 +311,7 @@ export default function ScheduleDesignerPage() {
             <Panel title="Colors">
               <ColorInput label="Primary" value={design.primaryColor} onChange={(value) => updateDesign({ primaryColor: value })} />
               <ColorInput label="Accent" value={design.accentColor} onChange={(value) => updateDesign({ accentColor: value })} />
-              <label className="mt-3 block text-sm"><input type="checkbox" checked={design.useRehearsalTypeColors} onChange={(event) => updateDesign({ useRehearsalTypeColors: event.target.checked })} className="mr-2" />Type colors</label>
+              <label className="mt-3 block text-sm"><input type="checkbox" checked={!design.useRehearsalTypeColors} onChange={(event) => updateDesign({ useRehearsalTypeColors: !event.target.checked })} className="mr-2" />Black &amp; white</label>
             </Panel>
 
             <Panel title="Text hierarchy" className="md:col-span-2">
@@ -315,6 +321,7 @@ export default function ScheduleDesignerPage() {
                 <TextStyleControl label="Work / beat" align={design.workTextAlign} bold={design.boldWork} onAlignChange={(workTextAlign) => updateDesign({ workTextAlign })} onBoldChange={(boldWork) => updateDesign({ boldWork })} />
                 <TextStyleControl label="Actor names" align={design.actorTextAlign} bold={design.boldActorNames} onAlignChange={(actorTextAlign) => updateDesign({ actorTextAlign })} onBoldChange={(boldActorNames) => updateDesign({ boldActorNames })} />
               </div>
+              <label className="mt-4 block text-sm font-medium">Cell content placement<select value={design.cellContentVerticalAlign} onChange={(event) => updateDesign({ cellContentVerticalAlign: event.target.value as ScheduleVerticalAlign })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="top">Top of cell</option><option value="center">Centered in cell</option><option value="bottom">Bottom of cell</option></select><span className="mt-1 block text-xs font-normal text-stone-500">Applies to the time, work, room, and called actors together, so the cell remains readable.</span></label>
             </Panel>
           </section>
 
@@ -360,7 +367,13 @@ export default function ScheduleDesignerPage() {
               <button onClick={autoFitCleanly} className="mt-6 rounded border border-line bg-white px-3 py-2 text-sm font-medium">Auto-fit cleanly</button>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 rounded border border-line bg-white px-3 py-2 text-sm font-medium"><Upload size={16} /> Upload production logo<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} className="hidden" /></label>
+            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium">Logo position<select value={design.logoPosition} onChange={(event) => updateDesign({ logoPosition: event.target.value as LogoPosition })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="topLeft">Header: left</option><option value="topCenter">Header: center</option><option value="topRight">Header: right</option><option value="footerLeft">Footer: left</option><option value="footerCenter">Footer: center</option><option value="footerRight">Footer: right</option></select></label><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={140} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /></label></div>}
             {design.logoDataUrl && <button onClick={() => updateDesign({ logoDataUrl: undefined })} className="mt-2 text-sm text-coral">Remove logo</button>}
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="text-sm font-medium">Director name<input value={design.directorName} onChange={(event) => updateDesign({ directorName: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" placeholder="Director name" /></label>
+              <label className="text-sm font-medium">Director contact<input value={design.directorContact} onChange={(event) => updateDesign({ directorContact: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" placeholder="Email or phone" /></label>
+              <label className="text-sm font-medium md:col-span-2">Show director details<select value={design.directorContactPlacement} onChange={(event) => updateDesign({ directorContactPlacement: event.target.value as ScheduleDesignSettings["directorContactPlacement"] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="none">Do not show</option><option value="header">In header</option><option value="footer">In footer</option></select></label>
+            </div>
             <label className="mt-3 block text-sm font-medium">Emergency contact<input value={design.emergencyContact} onChange={(event) => updateDesign({ emergencyContact: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" /></label>
             <label className="mt-3 block text-sm font-medium">Footer text<input value={design.footerText} onChange={(event) => updateDesign({ footerText: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" /></label>
           </details>

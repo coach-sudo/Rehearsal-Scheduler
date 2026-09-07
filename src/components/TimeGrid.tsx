@@ -1,4 +1,4 @@
-import type { AppState, PlannerSelection } from "../types";
+import type { AppState, PlannerBlockout, PlannerSelection } from "../types";
 import { useRef } from "react";
 import BeatPickerPopover from "./BeatPickerPopover";
 import { getBeatAvailability, getSlotBlockouts, isSlotBlocked } from "../utils/availability";
@@ -13,10 +13,11 @@ interface Props {
   openCell: string | null;
   setOpenCell: (key: string | null) => void;
   toggleSelection: (selection: PlannerSelection) => void;
+  onAddCall: (call: { date: string; startTime: string; laneId: string; type: Extract<PlannerBlockout["type"], "break" | "lunch"> }) => void;
   onRangeSelect?: (range: { date: string; laneId: string; startTime: string; endTime: string }) => void;
 }
 
-export default function TimeGrid({ state, showUnavailable, onlyNeedsRehearsal, onlyNotScheduled, openCell, setOpenCell, toggleSelection, onRangeSelect }: Props) {
+export default function TimeGrid({ state, showUnavailable, onlyNeedsRehearsal, onlyNotScheduled, openCell, setOpenCell, toggleSelection, onAddCall, onRangeSelect }: Props) {
   const dates = getWeekDates(state.settings.weekStartDate);
   const times = getTimeSlots(state.settings.rehearsalStartTime, state.settings.rehearsalEndTime, state.settings.plannerSlotMinutes);
   const visibleLanes = state.settings.lanes.slice(0, Math.max(1, state.settings.maxParallelBlocks));
@@ -122,6 +123,7 @@ export default function TimeGrid({ state, showUnavailable, onlyNeedsRehearsal, o
                     showUnavailable={showUnavailable}
                     selections={state.plannerSelections}
                     onToggle={(beatId) => toggleSelection({ date, startTime: time, laneId: lane, beatId })}
+                    onAddCall={(type) => onAddCall({ date, startTime: time, laneId: lane, type })}
                     onClose={() => setOpenCell(null)}
                   />
                 )}

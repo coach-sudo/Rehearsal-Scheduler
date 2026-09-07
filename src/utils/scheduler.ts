@@ -213,10 +213,18 @@ export function getBeatProgress(beatId: string, state: AppState) {
   const target = beat?.targetRehearsalCount ?? 3;
   const dates = entries.map((entry) => entry.date).sort();
   const lastRehearsedDate = dates[dates.length - 1];
-  const scheduledUpcomingCount = countBeatSessions(state.scheduledBlocks.filter((block) => block.beatIds.includes(beatId)));
+  // A saved schedule remains visible for review after it is logged. It should
+  // not also count as an upcoming rehearsal, otherwise one session appears in
+  // both totals.
+  const loggedBlockIds = new Set(state.scheduleLog.map((entry) => entry.scheduledBlockId));
+  const scheduledUpcomingCount = countBeatSessions(
+    state.scheduledBlocks.filter((block) => block.beatIds.includes(beatId) && !loggedBlockIds.has(block.id))
+  );
+  const plannedTowardGoal = Math.min(target, rehearsedCount + scheduledUpcomingCount);
   return {
     rehearsedCount,
     remainingCount: Math.max(0, target - rehearsedCount),
+    remainingAfterSchedule: Math.max(0, target - plannedTowardGoal),
     lastRehearsedDate,
     scheduledUpcomingCount,
     status: rehearsedCount === 0 ? "Not started" : rehearsedCount >= target ? "Done" : "In progress",
