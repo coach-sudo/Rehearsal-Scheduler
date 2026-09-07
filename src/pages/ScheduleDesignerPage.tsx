@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Download, Grid3X3, Printer, Upload } from "lucide-react";
 import { useAppState } from "../App";
-import type { AppState, BlockStyle, CustomBlockLayout, FontPairing, HeaderStyle, LogoPosition, PaperSize, PrintOrientation, PrintSpacing, ScheduledBlock, ScheduleDesignCell, ScheduleDesignPlaceholder, ScheduleDesignSettings, ScheduleTemplate, ScheduleTextAlign, ScheduleVerticalAlign } from "../types";
+import type { AppState, BlockStyle, CustomBlockLayout, FontPairing, HeaderStyle, PaperSize, PrintOrientation, PrintSpacing, ScheduledBlock, ScheduleDesignCell, ScheduleDesignPlaceholder, ScheduleDesignSettings, ScheduleTemplate, ScheduleTextAlign, ScheduleVerticalAlign } from "../types";
 import { actorNames, beatTitles, blockTypeColor, characterNames, dayLabel, durationLabel, fontPairings, formatScheduleTime, iconForBlock, scheduleExportHtml, scheduleTemplates, sortedBlocks } from "../utils/scheduleDesign";
 import { getTimeSlots, getWeekDates, id, timeToMinutes } from "../utils/time";
 
@@ -143,8 +143,38 @@ export default function ScheduleDesignerPage() {
       selectedElement?.classList.add("preview-selection");
       setPreviewSelection(selection);
     };
+    const logo = doc.querySelector<HTMLElement>("[data-page-logo]");
+    logo?.addEventListener("pointerdown", (event) => {
+      const paper = logo.closest<HTMLElement>(".schedule-paper");
+      if (!paper) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const paperRect = paper.getBoundingClientRect();
+      const logoRect = logo.getBoundingClientRect();
+      const pointerOffsetX = event.clientX - logoRect.left;
+      const pointerOffsetY = event.clientY - logoRect.top;
+      const moveLogo = (moveEvent: PointerEvent) => {
+        const maxX = Math.max(0, paperRect.width - logoRect.width);
+        const maxY = Math.max(0, paperRect.height - logoRect.height);
+        const x = Math.max(0, Math.min(maxX, moveEvent.clientX - paperRect.left - pointerOffsetX));
+        const y = Math.max(0, Math.min(maxY, moveEvent.clientY - paperRect.top - pointerOffsetY));
+        logo.style.left = `${(x / paperRect.width) * 100}%`;
+        logo.style.top = `${(y / paperRect.height) * 100}%`;
+      };
+      const dropLogo = (dropEvent: PointerEvent) => {
+        moveLogo(dropEvent);
+        const x = Number.parseFloat(logo.style.left);
+        const y = Number.parseFloat(logo.style.top);
+        updateDesign({ logoX: Number.isFinite(x) ? x : design.logoX, logoY: Number.isFinite(y) ? y : design.logoY });
+        doc.removeEventListener("pointermove", moveLogo);
+        doc.removeEventListener("pointerup", dropLogo);
+      };
+      doc.addEventListener("pointermove", moveLogo);
+      doc.addEventListener("pointerup", dropLogo);
+    });
     doc.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
+      if (target?.closest?.("[data-page-logo]")) return;
       const block = target?.closest?.("[data-block-id]") as HTMLElement | null;
       if (block?.dataset.blockId) {
         event.preventDefault();
@@ -420,7 +450,7 @@ export default function ScheduleDesignerPage() {
               <button onClick={autoFitCleanly} className="mt-6 rounded border border-line bg-white px-3 py-2 text-sm font-medium">Auto-fit cleanly</button>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 rounded border border-line bg-white px-3 py-2 text-sm font-medium"><Upload size={16} /> Upload production logo<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} className="hidden" /></label>
-            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium">Logo position<select value={design.logoPosition} onChange={(event) => updateDesign({ logoPosition: event.target.value as LogoPosition })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="topLeft">Header: left</option><option value="topCenter">Header: center</option><option value="topRight">Header: right</option><option value="footerLeft">Footer: left</option><option value="footerCenter">Footer: center</option><option value="footerRight">Footer: right</option></select></label><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={320} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Logos float over the page. They never shift the title, schedule, or footer.</span></label></div>}
+            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded border border-line bg-panel px-3 py-2 text-sm text-stone-700"><strong className="block">Place logo on the page</strong><span className="mt-1 block text-xs">Drag it directly in the preview. It can sit anywhere on the paper and never shifts schedule content.</span></div><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={320} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">The slider controls the printed size, without changing page spacing.</span></label></div>}
             {design.logoDataUrl && <button onClick={() => updateDesign({ logoDataUrl: undefined })} className="mt-2 text-sm text-coral">Remove logo</button>}
             <div className="mt-3 rounded border border-line bg-panel p-3">
               <div className="mb-2 flex items-center justify-between"><strong className="text-sm">Director details</strong><span className="text-xs text-stone-500">Up to 3</span></div>

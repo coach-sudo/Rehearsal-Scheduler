@@ -55,6 +55,8 @@ const settings: Settings = {
     headerLabel: "Weekly Rehearsal Schedule",
     logoPosition: "topRight",
     logoSize: 96,
+    logoX: 78,
+    logoY: 2,
     directorName: "",
     directorContact: "",
     directors: [

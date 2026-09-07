@@ -196,6 +196,8 @@ export interface ScheduleDesignSettings {
   logoDataUrl?: string;
   logoPosition: LogoPosition;
   logoSize: number;
+  logoX: number;
+  logoY: number;
   directorName: string;
   directorContact: string;
   directors: DirectorScheduleContact[];
