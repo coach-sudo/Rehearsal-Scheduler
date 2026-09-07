@@ -152,7 +152,10 @@ function contentFitScale(state: AppState, design: ScheduleDesignSettings) {
   const blockPressure = design.renderMode === "weeklyGrid" ? blocks.length / 24 : blocks.length / 20;
   const dayPressure = design.renderMode === "weeklyGrid" ? maxDayBlocks / 7 : maxDayBlocks / 5;
   const detailPressure = detailWeight * 0.045;
-  const raw = 1.08 - Math.max(blockPressure, dayPressure) * 0.18 - detailPressure;
+  // Larger type needs a little more room. The content still fits the selected
+  // paper target, but the designer's type scale remains visibly responsive.
+  const textPressure = Math.max(0, (design.minimumTextSize ?? 11) - 11) * 0.035;
+  const raw = 1.08 - Math.max(blockPressure, dayPressure) * 0.18 - detailPressure - textPressure;
   return Math.max(0.72, Math.min(1, Number(raw.toFixed(3))));
 }
 
@@ -748,7 +751,7 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
   const bg = dark ? "#101827" : "#fffefb";
   const ink = dark ? "#f8fafc" : design.primaryColor;
   const blockPad = onePage ? compactness === "tight" ? "4px 5px" : "5px 7px" : design.density < 35 ? "6px 8px" : design.density > 70 ? "14px 16px" : "10px 12px";
-  const minText = onePage ? Math.max(9, Math.min(design.minimumTextSize ?? 11, compactness === "tight" ? 10 : 11)) : Math.max(9, design.minimumTextSize ?? 11);
+  const minText = Math.max(8, Math.min(design.minimumTextSize ?? 11, 16));
   const tableText = Math.max(8.5, onePage ? minText - 1 : Math.max(minText - 1, design.density < 35 ? 9 : 10.5));
   const detailText = Math.max(9, onePage ? minText : Math.max(minText, design.density < 35 ? 10 : 12));
   const microText = Math.max(8, onePage ? minText - 1.25 : minText - 1.5);

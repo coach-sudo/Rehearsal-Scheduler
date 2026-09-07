@@ -296,6 +296,7 @@ export default function ScheduleDesignerPage() {
           <section hidden={designerTab !== "content"} className="grid gap-3 md:grid-cols-2">
             <Panel title="Fast Tweaks">
               <label className="block text-sm font-medium">Density <span className="text-stone-500">{design.density}</span><input type="range" min={10} max={100} value={design.density} onChange={(event) => updateDesign({ density: Number(event.target.value) })} className="mt-2 w-full" /></label>
+              <label className="mt-3 block text-sm font-medium">Text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={16} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Changes the actual schedule preview and print size. One-page fit adapts around it.</span></label>
               <label className="mt-3 block text-sm font-medium">Font<select value={design.fontPairing} onChange={(event) => updateDesign({ fontPairing: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
               <label className="mt-3 block text-sm font-medium">Block style<select value={design.blockStyle} onChange={(event) => updateDesign({ blockStyle: event.target.value as BlockStyle })} className="mt-1 block w-full rounded border border-line px-3 py-2">{blockStyles.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}</select></label>
               {design.template === "beatCardsByDay" && <label className="mt-3 block text-sm font-medium">Time placement<select value={design.cardTimePlacement} onChange={(event) => updateDesign({ cardTimePlacement: event.target.value as ScheduleDesignSettings["cardTimePlacement"] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="top">Above the work</option><option value="leftRail">Left side rail</option></select></label>}
@@ -355,7 +356,7 @@ export default function ScheduleDesignerPage() {
               <label className="text-sm font-medium">Orientation<select value={design.orientation} onChange={(event) => updateDesign({ orientation: event.target.value as PrintOrientation })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
               <label className="text-sm font-medium">Spacing<select value={design.spacing} onChange={(event) => updateDesign({ spacing: event.target.value as PrintSpacing })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="large">Large print</option></select></label>
               <label className="text-sm font-medium">Page fit<select value={design.paginationMode} onChange={(event) => updateDesign({ paginationMode: event.target.value as ScheduleDesignSettings["paginationMode"], customPageCount: event.target.value === "forceTwoPages" ? 2 : 1, customLayoutEnabled: false, customBlockLayouts: {}, customCells: [] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="preferOnePage">One-page auto-fit</option><option value="readableAuto">Readable one page</option><option value="forceTwoPages">Use two pages</option></select></label>
-              <label className="text-sm font-medium">Minimum text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={9} max={16} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 block w-full" /></label>
+              <div className="rounded border border-line bg-panel px-3 py-2 text-sm text-stone-600">Text size lives under <strong className="font-semibold text-ink">Content</strong>, so every visual adjustment stays together.</div>
               <button onClick={autoFitCleanly} className="mt-6 rounded border border-line bg-white px-3 py-2 text-sm font-medium">Auto-fit cleanly</button>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 rounded border border-line bg-white px-3 py-2 text-sm font-medium"><Upload size={16} /> Upload production logo<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} className="hidden" /></label>
@@ -639,7 +640,7 @@ function CustomLayoutEditor() {
             ) : selectedBlock ? (
               <div>
                 <div className="mb-2 truncate text-sm font-semibold">{beatTitles(selectedBlock, state) || selectedBlock.customTitle || "Rehearsal card"}</div>
-                <label className="text-xs font-medium">Card text size <span className="text-stone-500">{design.density}</span><input type="range" min={10} max={100} value={design.density} onChange={(event) => updateDesignPatch({ density: Number(event.target.value) })} className="mt-2 w-full" /></label>
+                <label className="text-xs font-medium">Card text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={16} value={design.minimumTextSize} onChange={(event) => updateDesignPatch({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /></label>
                 {selectedBlockLayout && (
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <label className="text-xs font-medium">Width <span className="text-stone-500">{Math.round(selectedBlockLayout.width)}%</span><input type="range" min={8} max={96} value={selectedBlockLayout.width} onChange={(event) => updateLayout(selectedBlock, selectedBlockLayout.page, { width: Number(event.target.value) })} className="mt-2 w-full" /></label>
@@ -782,18 +783,19 @@ function CustomLayoutEditor() {
 function CustomBlockContent({ block, blockIndex, color }: { block: ScheduledBlock; blockIndex: number; color: string }) {
   const { state } = useAppState();
   const design = state.settings.scheduleDesign;
-  const titleSize = design.density < 35 ? "text-[13px]" : design.density > 70 ? "text-lg" : "text-base";
+  const textSize = Math.max(8, Math.min(design.minimumTextSize ?? 11, 16));
+  const titleSize = Math.max(textSize + 2, design.density < 35 ? 13 : design.density > 70 ? 18 : 16);
 
   return (
     <>
-      <div className="pr-8 text-[10px] font-extrabold uppercase tracking-wide" style={{ color }}>
+      <div className="pr-8 font-extrabold uppercase tracking-wide" style={{ color, fontSize: Math.max(8, textSize - 1) }}>
         {dayLabel(block.date)} | {formatScheduleTime(block.startTime, design)} - {formatScheduleTime(block.endTime, design)}
         {design.showDurations ? ` | ${durationLabel(block)}` : ""}
       </div>
-      <div className={`mt-0.5 truncate font-black ${titleSize}`}>
+      <div className="mt-0.5 truncate font-black" style={{ fontSize: titleSize }}>
         {design.showIcons ? `${iconForBlock(block, state)} ` : ""}{beatTitles(block, state) || "Untitled rehearsal"}
       </div>
-      <div className="mt-1 space-y-0.5 text-[11px] leading-snug opacity-80">
+      <div className="mt-1 space-y-0.5 leading-snug opacity-80" style={{ fontSize: Math.max(8, textSize - 1) }}>
         {design.showRehearsalNumbers && <div><strong>Rehearsal #:</strong> {blockIndex + 1}</div>}
         {design.showCharacterNames && <div><strong>{design.charactersLabel || "Characters"}:</strong> {characterNames(block, state) || "None listed"}</div>}
         {design.showActorNames && <div><strong>{design.actorsLabel || "Actors"}:</strong> {actorNames(block, state) || "None listed"}</div>}
