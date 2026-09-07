@@ -136,6 +136,7 @@ export type FontPairing = "classic" | "theatrical" | "modern" | "film" | "youth"
 export type BlockStyle = "rounded" | "sharp" | "sticky" | "outline" | "filled" | "minimal";
 export type HeaderStyle = "simple" | "marquee" | "callsheet" | "banner" | "divider" | "ribbon";
 export type ScheduleLayout = "stacked" | "timeline" | "cards" | "grid" | "matrix" | "table" | "calls";
+export type RenderMode = "dayStack" | "weeklyGrid" | "roomBoard" | "denseTable";
 export type ScheduleRenderMode =
   | "beatCardsByDay"
   | "horizontalTimeline"
@@ -143,6 +144,7 @@ export type ScheduleRenderMode =
   | "runOfDayStrip"
   | "dayStack"
   | "weeklyGrid"
+  | "roomBoard"
   | "roomMatrix"
   | "actorCallSheet"
   | "directorWorklist"

@@ -141,7 +141,7 @@ export default function ScheduleDesignerPage() {
       showRehearsalNumbers: template.showRehearsalNumbers,
       paperSize: "letter",
       customPageCount: 1,
-      paginationMode: "readableAuto",
+      paginationMode: "preferOnePage",
       customLayoutEnabled: false,
       customShowBlockCards: true,
       customCanvasZoom: 100,
@@ -233,7 +233,7 @@ export default function ScheduleDesignerPage() {
     updateDesign({
       customLayoutEnabled: false,
       customBlockLayouts: {},
-      paginationMode: useTwoPages ? "forceTwoPages" : "readableAuto",
+      paginationMode: useTwoPages ? "forceTwoPages" : "preferOnePage",
       paperSize: "letter",
       orientation: landscapeTemplate ? "landscape" : activeTemplate.orientation,
       spacing: blockCount > 10 ? "compact" : "comfortable",
@@ -354,7 +354,7 @@ export default function ScheduleDesignerPage() {
               <label className="text-sm font-medium">Paper<select value={design.paperSize} onChange={(event) => updateDesign({ paperSize: event.target.value as PaperSize })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="letter">Letter</option><option value="legal">Legal</option><option value="a4">A4</option></select></label>
               <label className="text-sm font-medium">Orientation<select value={design.orientation} onChange={(event) => updateDesign({ orientation: event.target.value as PrintOrientation })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>
               <label className="text-sm font-medium">Spacing<select value={design.spacing} onChange={(event) => updateDesign({ spacing: event.target.value as PrintSpacing })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="compact">Compact</option><option value="comfortable">Comfortable</option><option value="large">Large print</option></select></label>
-              <label className="text-sm font-medium">Page fit<select value={design.paginationMode} onChange={(event) => updateDesign({ paginationMode: event.target.value as ScheduleDesignSettings["paginationMode"], customPageCount: event.target.value === "forceTwoPages" ? 2 : 1, customLayoutEnabled: false, customBlockLayouts: {}, customCells: [] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="preferOnePage">Keep one letter page</option><option value="readableAuto">Add a page only when needed</option><option value="forceTwoPages">Use two letter pages</option></select></label>
+              <label className="text-sm font-medium">Page fit<select value={design.paginationMode} onChange={(event) => updateDesign({ paginationMode: event.target.value as ScheduleDesignSettings["paginationMode"], customPageCount: event.target.value === "forceTwoPages" ? 2 : 1, customLayoutEnabled: false, customBlockLayouts: {}, customCells: [] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="preferOnePage">One-page auto-fit</option><option value="readableAuto">Readable one page</option><option value="forceTwoPages">Use two pages</option></select></label>
               <label className="text-sm font-medium">Minimum text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={9} max={16} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 block w-full" /></label>
               <button onClick={autoFitCleanly} className="mt-6 rounded border border-line bg-white px-3 py-2 text-sm font-medium">Auto-fit cleanly</button>
             </div>

@@ -17,7 +17,8 @@ export function loadState(storageKey = STORAGE_KEY): AppState {
 
 export function normalizeState(parsed: Partial<AppState>): AppState {
   const savedDesign = parsed.settings?.scheduleDesign;
-  const migratedFromEarlierFitBehavior = !savedDesign?.fitBehaviorVersion || savedDesign.fitBehaviorVersion < 3;
+  const migratedFromEarlierFitBehavior = !savedDesign?.fitBehaviorVersion || savedDesign.fitBehaviorVersion < 4;
+  const migratedFromEarlierDesignSystem = !savedDesign?.designSystemVersion || savedDesign.designSystemVersion < 3;
   const isSupportedTemplate = savedDesign?.template === "weeklyGrid" || savedDesign?.template === "beatCardsByDay";
   const template = isSupportedTemplate ? savedDesign!.template : "beatCardsByDay";
   return {
@@ -39,9 +40,9 @@ export function normalizeState(parsed: Partial<AppState>): AppState {
         template,
         renderMode: template === "weeklyGrid" ? "weeklyGrid" : "beatCardsByDay",
         customLayoutEnabled: false,
-        paginationMode: migratedFromEarlierFitBehavior ? "readableAuto" : savedDesign?.paginationMode ?? demoState.settings.scheduleDesign.paginationMode,
-        fitBehaviorVersion: 3,
-        designSystemVersion: 2,
+        paginationMode: migratedFromEarlierFitBehavior || migratedFromEarlierDesignSystem ? "preferOnePage" : savedDesign?.paginationMode ?? demoState.settings.scheduleDesign.paginationMode,
+        fitBehaviorVersion: 4,
+        designSystemVersion: 3,
         customCells: savedDesign?.customCells ?? demoState.settings.scheduleDesign.customCells,
       },
     },
