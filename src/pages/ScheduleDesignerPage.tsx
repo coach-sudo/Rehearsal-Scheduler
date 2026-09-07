@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Download, Grid3X3, Printer, Upload } from "lucide-react";
 import { useAppState } from "../App";
 import type { AppState, BlockStyle, CustomBlockLayout, FontPairing, HeaderStyle, LogoPosition, PaperSize, PrintOrientation, PrintSpacing, ScheduledBlock, ScheduleDesignCell, ScheduleDesignPlaceholder, ScheduleDesignSettings, ScheduleTemplate, ScheduleTextAlign, ScheduleVerticalAlign } from "../types";
@@ -83,6 +83,8 @@ function densityLabel(value: number) {
 export default function ScheduleDesignerPage() {
   const { state, setState } = useAppState();
   const [designerTab, setDesignerTab] = useState<"format" | "content" | "words" | "print">("format");
+  const [previewSelection, setPreviewSelection] = useState<{ kind: "page" | "block"; id?: string } | null>(null);
+  const previewRef = useRef<HTMLIFrameElement>(null);
   const design = state.settings.scheduleDesign;
   const activeTemplate = scheduleTemplates.find((template) => template.id === design.template) ?? scheduleTemplates[0];
   const displayFormatName = activeTemplate.label;
@@ -116,6 +118,42 @@ export default function ScheduleDesignerPage() {
 
   function updateSettings(patch: Partial<AppState["settings"]>) {
     setState((current) => ({ ...current, settings: { ...current.settings, ...patch } }));
+  }
+
+  function updateBlockTextSize(blockId: string, size?: number) {
+    setState((current) => {
+      const blockTextSizes = { ...current.settings.scheduleDesign.blockTextSizes };
+      if (size === undefined) delete blockTextSizes[blockId];
+      else blockTextSizes[blockId] = size;
+      return {
+        ...current,
+        settings: {
+          ...current.settings,
+          scheduleDesign: { ...current.settings.scheduleDesign, blockTextSizes },
+        },
+      };
+    });
+  }
+
+  function bindPreviewSelection() {
+    const doc = previewRef.current?.contentDocument;
+    if (!doc) return;
+    const select = (selection: { kind: "page" | "block"; id?: string }, selectedElement?: HTMLElement) => {
+      doc.querySelectorAll<HTMLElement>(".preview-selection").forEach((element) => element.classList.remove("preview-selection"));
+      selectedElement?.classList.add("preview-selection");
+      setPreviewSelection(selection);
+    };
+    doc.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      const block = target?.closest?.("[data-block-id]") as HTMLElement | null;
+      if (block?.dataset.blockId) {
+        event.preventDefault();
+        select({ kind: "block", id: block.dataset.blockId }, block);
+        return;
+      }
+      const paper = target?.closest?.(".schedule-paper") as HTMLElement | null;
+      if (paper) select({ kind: "page" }, paper);
+    });
   }
 
   function applyTemplate(templateId: ScheduleTemplate) {
@@ -302,7 +340,7 @@ export default function ScheduleDesignerPage() {
           <section hidden={designerTab !== "content"} className="grid gap-3 md:grid-cols-2">
             <Panel title="Fast Tweaks">
               <label className="block text-sm font-medium">Density <span className="text-stone-500">{densityLabel(design.density)} ({design.density})</span><input type="range" min={10} max={100} value={design.density} onChange={(event) => updateDesign({ density: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Controls grid header height, cell padding, and the amount of breathing room around details.</span></label>
-              <label className="mt-3 block text-sm font-medium">Text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={16} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Changes the actual schedule preview and print size. One-page fit adapts around it.</span></label>
+              <label className="mt-3 block text-sm font-medium">Page text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={28} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Changes the printed page. Click blank paper in the preview to select the whole page, or click one rehearsal block to adjust only that block.</span></label>
               <label className="mt-3 block text-sm font-medium">Font<select value={design.fontPairing} onChange={(event) => updateDesign({ fontPairing: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
               <label className="mt-3 block text-sm font-medium">Block style<select value={design.blockStyle} onChange={(event) => updateDesign({ blockStyle: event.target.value as BlockStyle })} className="mt-1 block w-full rounded border border-line px-3 py-2">{blockStyles.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}</select></label>
               {design.template === "beatCardsByDay" && <label className="mt-3 block text-sm font-medium">Time placement<select value={design.cardTimePlacement} onChange={(event) => updateDesign({ cardTimePlacement: event.target.value as ScheduleDesignSettings["cardTimePlacement"] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="top">Above the work</option><option value="leftRail">Left side rail</option></select></label>}
@@ -321,7 +359,22 @@ export default function ScheduleDesignerPage() {
                 <TextStyleControl label="Work / beat" align={design.workTextAlign} bold={design.boldWork} onAlignChange={(workTextAlign) => updateDesign({ workTextAlign })} onBoldChange={(boldWork) => updateDesign({ boldWork })} />
                 <TextStyleControl label="Actor names" align={design.actorTextAlign} bold={design.boldActorNames} onAlignChange={(actorTextAlign) => updateDesign({ actorTextAlign })} onBoldChange={(boldActorNames) => updateDesign({ boldActorNames })} />
               </div>
-              <label className="mt-4 block text-sm font-medium">Cell content placement<select value={design.cellContentVerticalAlign} onChange={(event) => updateDesign({ cellContentVerticalAlign: event.target.value as ScheduleVerticalAlign })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="top">Top of cell</option><option value="center">Centered in cell</option><option value="bottom">Bottom of cell</option></select><span className="mt-1 block text-xs font-normal text-stone-500">Applies to the time, work, room, and called actors together, so the cell remains readable.</span></label>
+              <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                <VerticalPositionControl label="Day header" value={design.dayCellVerticalAlign} onChange={(dayCellVerticalAlign) => updateDesign({ dayCellVerticalAlign })} />
+                <VerticalPositionControl label="Time cells" value={design.timeCellVerticalAlign} onChange={(timeCellVerticalAlign) => updateDesign({ timeCellVerticalAlign })} />
+                <VerticalPositionControl label="Beat / rehearsal cells" value={design.beatCellVerticalAlign} onChange={(beatCellVerticalAlign) => updateDesign({ beatCellVerticalAlign })} />
+              </div>
+              <p className="mt-2 text-xs text-stone-500">Each area moves independently. Time labels are positioned inside their own time interval, so top, center, and bottom visibly change the grid.</p>
+              {previewSelection?.kind === "block" && previewSelection.id && (() => {
+                const selectedBlock = state.scheduledBlocks.find((block) => block.id === previewSelection.id);
+                if (!selectedBlock) return null;
+                const requestedSize = design.blockTextSizes?.[selectedBlock.id] ?? design.minimumTextSize;
+                return <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <div className="flex items-center justify-between gap-2"><strong className="text-sm">Selected rehearsal block</strong><button onClick={() => updateBlockTextSize(selectedBlock.id)} className="text-xs font-semibold text-emerald-800 underline">Use page size</button></div>
+                  <p className="mt-1 text-xs text-emerald-900">{beatTitles(selectedBlock, state) || selectedBlock.customTitle || "Call"}. The printed cell automatically limits type before it can spill outside.</p>
+                  <label className="mt-2 block text-sm font-medium">This block&apos;s text <span className="text-stone-500">{requestedSize}px</span><input type="range" min={8} max={28} value={requestedSize} onChange={(event) => updateBlockTextSize(selectedBlock.id, Number(event.target.value))} className="mt-2 w-full" /></label>
+                </div>;
+              })()}
             </Panel>
           </section>
 
@@ -367,12 +420,22 @@ export default function ScheduleDesignerPage() {
               <button onClick={autoFitCleanly} className="mt-6 rounded border border-line bg-white px-3 py-2 text-sm font-medium">Auto-fit cleanly</button>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 rounded border border-line bg-white px-3 py-2 text-sm font-medium"><Upload size={16} /> Upload production logo<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} className="hidden" /></label>
-            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium">Logo position<select value={design.logoPosition} onChange={(event) => updateDesign({ logoPosition: event.target.value as LogoPosition })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="topLeft">Header: left</option><option value="topCenter">Header: center</option><option value="topRight">Header: right</option><option value="footerLeft">Footer: left</option><option value="footerCenter">Footer: center</option><option value="footerRight">Footer: right</option></select></label><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={140} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /></label></div>}
+            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><label className="text-sm font-medium">Logo position<select value={design.logoPosition} onChange={(event) => updateDesign({ logoPosition: event.target.value as LogoPosition })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="topLeft">Header: left</option><option value="topCenter">Header: center</option><option value="topRight">Header: right</option><option value="footerLeft">Footer: left</option><option value="footerCenter">Footer: center</option><option value="footerRight">Footer: right</option></select></label><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={220} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Top right uses the full header height while keeping the title clear.</span></label></div>}
             {design.logoDataUrl && <button onClick={() => updateDesign({ logoDataUrl: undefined })} className="mt-2 text-sm text-coral">Remove logo</button>}
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
-              <label className="text-sm font-medium">Director name<input value={design.directorName} onChange={(event) => updateDesign({ directorName: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" placeholder="Director name" /></label>
-              <label className="text-sm font-medium">Director contact<input value={design.directorContact} onChange={(event) => updateDesign({ directorContact: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" placeholder="Email or phone" /></label>
-              <label className="text-sm font-medium md:col-span-2">Show director details<select value={design.directorContactPlacement} onChange={(event) => updateDesign({ directorContactPlacement: event.target.value as ScheduleDesignSettings["directorContactPlacement"] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="none">Do not show</option><option value="header">In header</option><option value="footer">In footer</option></select></label>
+            <div className="mt-3 rounded border border-line bg-panel p-3">
+              <div className="mb-2 flex items-center justify-between"><strong className="text-sm">Director details</strong><span className="text-xs text-stone-500">Up to 3</span></div>
+              <div className="grid gap-2">
+                {Array.from({ length: 3 }, (_, index) => {
+                  const director = design.directors?.[index] ?? { name: index === 0 ? design.directorName : "", contact: index === 0 ? design.directorContact : "" };
+                  const directors = Array.from({ length: 3 }, (_, directorIndex) => design.directors?.[directorIndex] ?? { name: directorIndex === 0 ? design.directorName : "", contact: directorIndex === 0 ? design.directorContact : "" });
+                  const patchDirector = (patch: { name?: string; contact?: string }) => {
+                    directors[index] = { ...director, ...patch };
+                    updateDesign({ directors, directorName: directors[0].name, directorContact: directors[0].contact });
+                  };
+                  return <div key={index} className="grid gap-2 sm:grid-cols-2"><label className="text-sm font-medium">Director {index + 1}<input value={director.name} onChange={(event) => patchDirector({ name: event.target.value })} className="mt-1 w-full rounded border border-line bg-white px-3 py-2" placeholder="Name" /></label><label className="text-sm font-medium">Contact<input value={director.contact} onChange={(event) => patchDirector({ contact: event.target.value })} className="mt-1 w-full rounded border border-line bg-white px-3 py-2" placeholder="Email or phone" /></label></div>;
+                })}
+              </div>
+              <label className="mt-3 block text-sm font-medium">Show director details<select value={design.directorContactPlacement} onChange={(event) => updateDesign({ directorContactPlacement: event.target.value as ScheduleDesignSettings["directorContactPlacement"] })} className="mt-1 block w-full rounded border border-line bg-white px-3 py-2"><option value="none">Do not show</option><option value="header">In header</option><option value="footer">In footer</option></select></label>
             </div>
             <label className="mt-3 block text-sm font-medium">Emergency contact<input value={design.emergencyContact} onChange={(event) => updateDesign({ emergencyContact: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" /></label>
             <label className="mt-3 block text-sm font-medium">Footer text<input value={design.footerText} onChange={(event) => updateDesign({ footerText: event.target.value })} className="mt-1 w-full rounded border border-line px-3 py-2" /></label>
@@ -381,7 +444,8 @@ export default function ScheduleDesignerPage() {
         </aside>
 
         <div className="min-h-[calc(100vh-150px)] rounded-xl border border-line bg-[#dfe4dd] p-3 shadow-inner lg:p-4">
-          <iframe key={templateHtml} title="Designed schedule preview" srcDoc={templateHtml} className="h-[calc(100vh-170px)] min-h-[720px] w-full rounded-lg border border-line bg-white shadow-2xl" />
+          <div className="mb-2 flex items-center justify-between text-xs text-stone-600"><span>Click a rehearsal block to adjust only its text. Click open paper to adjust the whole page.</span>{previewSelection?.kind === "block" ? <span className="font-semibold text-emerald-800">Block selected</span> : previewSelection?.kind === "page" ? <span className="font-semibold text-emerald-800">Page selected</span> : null}</div>
+          <iframe ref={previewRef} key={templateHtml} onLoad={bindPreviewSelection} title="Designed schedule preview" srcDoc={templateHtml} className="h-[calc(100vh-190px)] min-h-[700px] w-full rounded-lg border border-line bg-white shadow-2xl" />
         </div>
       </div>
     </section>
@@ -653,7 +717,7 @@ function CustomLayoutEditor() {
             ) : selectedBlock ? (
               <div>
                 <div className="mb-2 truncate text-sm font-semibold">{beatTitles(selectedBlock, state) || selectedBlock.customTitle || "Rehearsal card"}</div>
-                <label className="text-xs font-medium">Card text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={16} value={design.minimumTextSize} onChange={(event) => updateDesignPatch({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /></label>
+                <label className="text-xs font-medium">Card text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={28} value={design.minimumTextSize} onChange={(event) => updateDesignPatch({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /></label>
                 {selectedBlockLayout && (
                   <div className="mt-2 grid gap-2 sm:grid-cols-2">
                     <label className="text-xs font-medium">Width <span className="text-stone-500">{Math.round(selectedBlockLayout.width)}%</span><input type="range" min={8} max={96} value={selectedBlockLayout.width} onChange={(event) => updateLayout(selectedBlock, selectedBlockLayout.page, { width: Number(event.target.value) })} className="mt-2 w-full" /></label>
@@ -1041,6 +1105,15 @@ function TextStyleControl({ label, align, bold, onAlignChange, onBoldChange }: {
     </div>
     <div className="grid grid-cols-3 gap-1" aria-label={`${label} alignment`}>
       {(["left", "center", "right"] as ScheduleTextAlign[]).map((option) => <button key={option} onClick={() => onAlignChange(option)} className={`rounded px-2 py-1.5 text-xs font-medium capitalize ${align === option ? "bg-ink text-white" : "bg-white text-stone-700 hover:bg-stone-100"}`}>{option}</button>)}
+    </div>
+  </div>;
+}
+
+function VerticalPositionControl({ label, value, onChange }: { label: string; value: ScheduleVerticalAlign; onChange: (value: ScheduleVerticalAlign) => void }) {
+  return <div className="rounded-lg border border-line bg-panel p-3">
+    <span className="block text-sm font-semibold">{label}</span>
+    <div className="mt-2 grid grid-cols-3 gap-1" aria-label={`${label} vertical position`}>
+      {(["top", "center", "bottom"] as ScheduleVerticalAlign[]).map((option) => <button key={option} onClick={() => onChange(option)} className={`rounded px-2 py-1.5 text-xs font-medium capitalize ${value === option ? "bg-ink text-white" : "bg-white text-stone-700 hover:bg-stone-100"}`}>{option}</button>)}
     </div>
   </div>;
 }

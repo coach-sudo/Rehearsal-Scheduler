@@ -163,6 +163,11 @@ export type CardTimePlacement = "top" | "leftRail";
 export type LogoPosition = "topLeft" | "topCenter" | "topRight" | "footerLeft" | "footerCenter" | "footerRight";
 export type DirectorContactPlacement = "none" | "header" | "footer";
 
+export interface DirectorScheduleContact {
+  name: string;
+  contact: string;
+}
+
 export interface ScheduleDesignSettings {
   template: ScheduleTemplate;
   customDesignName: string;
@@ -193,6 +198,7 @@ export interface ScheduleDesignSettings {
   logoSize: number;
   directorName: string;
   directorContact: string;
+  directors: DirectorScheduleContact[];
   directorContactPlacement: DirectorContactPlacement;
   rehearsalNotes: string;
   emergencyContact: string;
@@ -210,6 +216,9 @@ export interface ScheduleDesignSettings {
   workTextAlign: ScheduleTextAlign;
   actorTextAlign: ScheduleTextAlign;
   cellContentVerticalAlign: ScheduleVerticalAlign;
+  dayCellVerticalAlign: ScheduleVerticalAlign;
+  timeCellVerticalAlign: ScheduleVerticalAlign;
+  beatCellVerticalAlign: ScheduleVerticalAlign;
   boldTimes: boolean;
   boldWork: boolean;
   boldActorNames: boolean;
@@ -232,6 +241,7 @@ export interface ScheduleDesignSettings {
   customShowBlockCards: boolean;
   customScheduleStyle: "table" | "list" | "cards" | "timeline";
   customBlockLayouts: Record<string, CustomBlockLayout>;
+  blockTextSizes: Record<string, number>;
   customCells: ScheduleDesignCell[];
 }
 
