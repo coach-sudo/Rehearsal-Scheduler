@@ -777,8 +777,9 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
     /* The Weekly Grid is a self-contained schedule: called actors belong in
        the matching colored block, never in a space-consuming side legend. */
     .weekly-engine,.weekly-engine.has-call-key{grid-template-columns:minmax(0,1fr)}
-    .weekly-engine .pro-grid{grid-template-columns:${onePage ? ".78in" : ".86in"} minmax(0,1fr)}
-    .grid-call-block{padding:${onePage ? "3px 4px" : "5px 6px"};overflow:hidden;line-height:1.1}
+    .weekly-engine .pro-grid{grid-template-columns:${onePage ? ".78in" : ".86in"} minmax(0,1fr);contain:layout paint}
+    .weekly-call-key{display:none!important}
+    .grid-call-block{padding:${onePage ? "3px 4px" : "5px 6px"};overflow:hidden;line-height:1.1;contain:layout paint}
     .grid-call-block strong{padding-right:15px;font-size:${Math.max(8, Math.min(10.5, minText - 1))}px;line-height:1.05;overflow-wrap:anywhere}
     .grid-call-block span{display:block}
     .grid-call-time{font-size:${Math.max(8, Math.min(9.5, microText))}px;font-weight:var(--time-weight,850);color:var(--block-color);white-space:nowrap;text-align:var(--time-align,left)}
