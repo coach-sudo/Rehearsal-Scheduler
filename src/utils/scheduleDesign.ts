@@ -139,6 +139,10 @@ export function durationLabel(block: ScheduledBlock) {
 
 function contentFitScale(state: AppState, design: ScheduleDesignSettings) {
   if (design.paginationMode === "forceTwoPages") return 1;
+  // The proportional grid already allocates a real time band to every call.
+  // Scaling the whole grid makes the spreadsheet labels unreadable before the
+  // available page area is actually used.
+  if (design.renderMode === "weeklyGrid") return 1;
   const blocks = sortedBlocks(state.scheduledBlocks);
   if (!blocks.length) return 1;
   const dates = unique(blocks.map((block) => block.date));
@@ -773,12 +777,13 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
     /* The Weekly Grid is a self-contained schedule: called actors belong in
        the matching colored block, never in a space-consuming side legend. */
     .weekly-engine,.weekly-engine.has-call-key{grid-template-columns:minmax(0,1fr)}
+    .weekly-engine .pro-grid{grid-template-columns:${onePage ? ".78in" : ".86in"} minmax(0,1fr)}
     .grid-call-block{padding:${onePage ? "3px 4px" : "5px 6px"};overflow:hidden;line-height:1.1}
-    .grid-call-block strong{padding-right:15px;font-size:${Math.max(8.5, minText - 1)}px;line-height:1.1;overflow-wrap:anywhere}
+    .grid-call-block strong{padding-right:15px;font-size:${Math.max(8, Math.min(10.5, minText - 1))}px;line-height:1.05;overflow-wrap:anywhere}
     .grid-call-block span{display:block}
-    .grid-call-time{font-size:${microText}px;font-weight:var(--time-weight,850);color:var(--block-color);white-space:nowrap;text-align:var(--time-align,left)}
-    .grid-call-room{font-size:${Math.max(7.5, microText - .35)}px;text-align:var(--actor-align,left);font-weight:750;opacity:.76;white-space:normal;overflow-wrap:anywhere}
-    .grid-call-actors,.grid-call-detail{margin-top:1px;font-size:${Math.max(7.2, microText - .55)}px;line-height:1.12;text-align:var(--actor-align,left);overflow-wrap:anywhere}
+    .grid-call-time{font-size:${Math.max(8, Math.min(9.5, microText))}px;font-weight:var(--time-weight,850);color:var(--block-color);white-space:nowrap;text-align:var(--time-align,left)}
+    .grid-call-room{font-size:${Math.max(7.5, Math.min(9, microText - .35))}px;text-align:var(--actor-align,left);font-weight:750;opacity:.76;white-space:normal;overflow-wrap:anywhere}
+    .grid-call-actors,.grid-call-detail{margin-top:1px;font-size:${Math.max(7.2, Math.min(9, microText - .55))}px;line-height:1.08;text-align:var(--actor-align,left);overflow-wrap:anywhere}
     .grid-call-actors b{font-weight:var(--actor-weight,850)}
     .grid-call-detail{opacity:.8}
     .grid-call-block em{display:block;margin-top:1px;font-size:${Math.max(7, microText - .8)}px;line-height:1.1;color:#b42318;font-style:normal;font-weight:800;overflow-wrap:anywhere}
