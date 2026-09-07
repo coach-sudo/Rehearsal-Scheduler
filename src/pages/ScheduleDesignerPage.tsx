@@ -154,10 +154,15 @@ export default function ScheduleDesignerPage() {
       const pointerOffsetX = event.clientX - logoRect.left;
       const pointerOffsetY = event.clientY - logoRect.top;
       const moveLogo = (moveEvent: PointerEvent) => {
-        const maxX = Math.max(0, paperRect.width - logoRect.width);
-        const maxY = Math.max(0, paperRect.height - logoRect.height);
-        const x = Math.max(0, Math.min(maxX, moveEvent.clientX - paperRect.left - pointerOffsetX));
-        const y = Math.max(0, Math.min(maxY, moveEvent.clientY - paperRect.top - pointerOffsetY));
+        // Keep the drag responsive all the way to every page edge. A small
+        // overscan lets the logo sit in a header or footer without a fake
+        // invisible margin around the paper.
+        const minX = -paperRect.width * 0.2;
+        const minY = -paperRect.height * 0.2;
+        const maxX = paperRect.width;
+        const maxY = paperRect.height;
+        const x = Math.max(minX, Math.min(maxX, moveEvent.clientX - paperRect.left - pointerOffsetX));
+        const y = Math.max(minY, Math.min(maxY, moveEvent.clientY - paperRect.top - pointerOffsetY));
         logo.style.left = `${(x / paperRect.width) * 100}%`;
         logo.style.top = `${(y / paperRect.height) * 100}%`;
       };

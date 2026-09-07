@@ -376,8 +376,10 @@ function renderFooter(design: ScheduleDesignSettings) {
 
 function renderPageLogo(design: ScheduleDesignSettings) {
   if (!design.logoDataUrl) return "";
-  const x = Math.max(0, Math.min(100, design.logoX ?? 78));
-  const y = Math.max(0, Math.min(100, design.logoY ?? 2));
+  // The logo is a true page layer. Negative offsets are intentional: they
+  // allow a director to use the very top/edge of the printable paper.
+  const x = Math.max(-20, Math.min(100, design.logoX ?? 78));
+  const y = Math.max(-20, Math.min(100, design.logoY ?? 2));
   return `<img class="logo page-logo" data-page-logo="true" src="${design.logoDataUrl}" alt="" style="left:${x}%;top:${y}%">`;
 }
 
