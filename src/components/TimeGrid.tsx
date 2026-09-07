@@ -2,6 +2,7 @@ import type { AppState, PlannerSelection } from "../types";
 import { useRef } from "react";
 import BeatPickerPopover from "./BeatPickerPopover";
 import { getBeatAvailability, getSlotBlockouts, isSlotBlocked } from "../utils/availability";
+import { checkBeatConflicts } from "../utils/scheduler";
 import { addMinutes, formatTime, getDayOfWeek, getTimeSlots, getWeekDates, shortDayNames, timeToMinutes } from "../utils/time";
 
 interface Props {
@@ -22,27 +23,17 @@ export default function TimeGrid({ state, showUnavailable, onlyNeedsRehearsal, o
   const selectedThisWeek = new Set(state.plannerSelections.filter((selection) => dates.includes(selection.date)).map((selection) => selection.beatId));
   const dragStart = useRef<{ date: string; laneId: string; startTime: string } | null>(null);
 
-  function occupiedActorIds(date: string, startTime: string, laneId: string) {
-    const selectedBeatIds = state.plannerSelections
-      .filter((selection) => selection.date === date && selection.startTime === startTime && selection.laneId !== laneId)
-      .map((selection) => selection.beatId);
-    return new Set(
-      selectedBeatIds.flatMap((beatId) => state.beats.find((beat) => beat.id === beatId)?.rosterActorIds ?? [])
-    );
-  }
-
   function optionsFor(date: string, startTime: string, laneId: string) {
-    const occupied = occupiedActorIds(date, startTime, laneId);
     return state.beats
       .filter((beat) => !onlyNeedsRehearsal || state.scheduleLog.filter((entry) => entry.beatId === beat.id).length < beat.targetRehearsalCount)
       .filter((beat) => !onlyNotScheduled || !selectedThisWeek.has(beat.id))
       .map((beat) => {
         const availability = getBeatAvailability(beat.id, date, startTime, state);
-        const laneConflicts = beat.rosterActorIds
-          .filter((actorId) => occupied.has(actorId))
-          .map((actorId) => state.actors.find((actor) => actor.id === actorId))
+        const check = checkBeatConflicts(beat, date, startTime, addMinutes(startTime, state.settings.plannerSlotMinutes), laneId, state);
+        const laneConflicts = check.conflicts.filter((conflict) => conflict.reason === "Called in another lane" && conflict.actorId)
+          .map((conflict) => state.actors.find((actor) => actor.id === conflict.actorId))
           .filter((actor): actor is NonNullable<typeof actor> => Boolean(actor));
-        if (!laneConflicts.length) return availability;
+        if (check.canSchedule || !laneConflicts.length) return { ...availability, canRehearse: check.canSchedule };
         const missingActors = [...availability.missingActors, ...laneConflicts.filter((actor) => !availability.missingActors.some((missing) => missing.id === actor.id))];
         return {
           ...availability,

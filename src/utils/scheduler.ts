@@ -1,6 +1,68 @@
-import type { AppState, PlannerSelection, ScheduleLogEntry, ScheduledBlock } from "../types";
+import type { AppState, Beat, PlannerSelection, ScheduleLogEntry, ScheduledBlock } from "../types";
 import { addMinutes, getWeekDates, id, overlaps, sameBeatSet, timeToMinutes } from "./time";
-import { isActorAvailable } from "./availability";
+import { getBeatAvailability, isActorAvailable, isSlotBlocked } from "./availability";
+
+export interface SchedulingConflict {
+  actorId?: string;
+  actorName?: string;
+  reason: string;
+}
+
+export interface BeatConflictCheck {
+  canSchedule: boolean;
+  conflicts: SchedulingConflict[];
+}
+
+/**
+ * One source of truth for planner validation. It deliberately allows several
+ * beats in one lane (a combined rehearsal), while preventing an actor from
+ * being called in two lanes at the same time.
+ */
+export function checkBeatConflicts(
+  beat: Beat,
+  date: string,
+  startTime: string,
+  endTime: string,
+  laneId: string,
+  state: AppState,
+): BeatConflictCheck {
+  const conflicts = new Map<string, SchedulingConflict>();
+  const slotMinutes = state.settings.plannerSlotMinutes;
+
+  for (let minute = timeToMinutes(startTime); minute < timeToMinutes(endTime); minute += slotMinutes) {
+    const slotStart = addMinutes("00:00", minute);
+    const slotEnd = addMinutes(slotStart, slotMinutes);
+    if (isSlotBlocked(date, slotStart, slotEnd, laneId, state)) {
+      conflicts.set(`blocked:${slotStart}`, { reason: "Blocked by a break, blackout, late start, or half day" });
+      continue;
+    }
+
+    const availability = getBeatAvailability(beat.id, date, slotStart, state);
+    if (!availability.canRehearse) {
+      availability.missingActors.forEach((actor) => {
+        conflicts.set(`availability:${actor.id}`, { actorId: actor.id, actorName: actor.name, reason: availability.overrideConflicts.some((item) => item.id === actor.id) ? "Unavailable override" : "Not available" });
+      });
+      const missingActorIds = beat.rosterActorIds.filter((actorId) => !state.actors.some((actor) => actor.id === actorId && actor.active));
+      missingActorIds.forEach((actorId) => conflicts.set(`missing:${actorId}`, { actorId, reason: "Missing or inactive actor" }));
+    }
+
+    const laneCalls = state.plannerSelections
+      .filter((selection) => selection.date === date && selection.startTime === slotStart && selection.laneId !== laneId)
+      .flatMap((selection) => state.beats.find((candidate) => candidate.id === selection.beatId)?.rosterActorIds ?? []);
+    const savedLaneCalls = state.scheduledBlocks
+      .filter((block) => block.date === date && block.laneId !== laneId && overlaps(slotStart, slotEnd, block.startTime, block.endTime))
+      .flatMap((block) => block.actorIds);
+    const calledElsewhere = new Set([...laneCalls, ...savedLaneCalls]);
+    beat.rosterActorIds
+      .filter((actorId) => calledElsewhere.has(actorId))
+      .forEach((actorId) => {
+        const actor = state.actors.find((candidate) => candidate.id === actorId);
+        conflicts.set(`lane:${actorId}`, { actorId, actorName: actor?.name, reason: "Called in another lane" });
+      });
+  }
+
+  return { canSchedule: conflicts.size === 0, conflicts: [...conflicts.values()] };
+}
 
 export function getUniqueActorsForBeats(beatIds: string[], state: Pick<AppState, "beats">): string[] {
   const actorIds = new Set<string>();

@@ -30,6 +30,7 @@ const dayPatterns: Array<[DayOfWeek, RegExp]> = [
 ];
 
 export function parseCsv(text: string): string[][] {
+  const delimiter = detectDelimiter(text);
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = "";
@@ -42,7 +43,7 @@ export function parseCsv(text: string): string[][] {
       index += 1;
     } else if (char === '"') {
       quoted = !quoted;
-    } else if (char === "," && !quoted) {
+    } else if (char === delimiter && !quoted) {
       row.push(cell.trim());
       cell = "";
     } else if ((char === "\n" || char === "\r") && !quoted) {
@@ -58,6 +59,29 @@ export function parseCsv(text: string): string[][] {
   row.push(cell.trim());
   if (row.some(Boolean)) rows.push(row);
   return rows;
+}
+
+// Google Forms exports are CSV, while copied Google Sheets ranges are usually
+// tab-separated. Supporting both makes imports work from either workflow.
+function detectDelimiter(text: string): "," | "\t" {
+  const firstLine = text.split(/\r?\n/, 1)[0] ?? "";
+  let commas = 0;
+  let tabs = 0;
+  let quoted = false;
+  for (let index = 0; index < firstLine.length; index += 1) {
+    const character = firstLine[index];
+    const next = firstLine[index + 1];
+    if (character === '"' && quoted && next === '"') {
+      index += 1;
+    } else if (character === '"') {
+      quoted = !quoted;
+    } else if (!quoted && character === ",") {
+      commas += 1;
+    } else if (!quoted && character === "\t") {
+      tabs += 1;
+    }
+  }
+  return tabs > commas ? "\t" : ",";
 }
 
 export function guessFormsImport(csvText: string, state: AppState): FormsImportGuess {

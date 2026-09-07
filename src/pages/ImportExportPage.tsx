@@ -55,12 +55,12 @@ export default function ImportExportPage() {
           </div>
           <div className="mt-6 border-t border-line pt-4">
             <h3 className="font-semibold">Google Forms availability import</h3>
-            <p className="mt-1 text-sm text-stone-600">Upload or paste a Google Forms CSV. The app guesses name, email, role, and any day/time availability questions.</p>
+            <p className="mt-1 text-sm text-stone-600">Upload a Google Forms CSV, or paste a copied Google Sheets range. The app reads both comma- and tab-separated data, then suggests name, email, role, and availability fields.</p>
             <label className="mt-3 inline-block cursor-pointer rounded border border-line bg-white px-3 py-2 text-sm font-medium">
               Upload Forms CSV
               <input type="file" accept=".csv,text/csv" onChange={(event) => uploadFormsCsv(event.target.files?.[0])} className="hidden" />
             </label>
-            <textarea value={formsCsv} onChange={(event) => { setFormsCsv(event.target.value); setManualMapping(null); }} className="mt-3 h-52 w-full rounded border border-line p-3 font-mono text-xs" placeholder={'Paste Google Forms CSV here. Example headers: "Name","Email","Role","Monday 3:00-3:30","Tuesday 4 PM"'} />
+            <textarea value={formsCsv} onChange={(event) => { setFormsCsv(event.target.value); setManualMapping(null); }} className="mt-3 h-52 w-full rounded border border-line p-3 font-mono text-xs" placeholder={'Paste Google Forms CSV or a copied Google Sheets range here. Example headers: "Name","Email","Role","Monday 3:00-3:30","Tuesday 4 PM"'} />
             {formsGuess && activeMapping && (
               <div className="mt-4 rounded-lg border border-line bg-panel p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">

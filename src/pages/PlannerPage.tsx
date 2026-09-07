@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import { useAppState } from "../App";
 import TimeGrid from "../components/TimeGrid";
 import ConflictModal from "../components/ConflictModal";
-import { getBeatProgress, mergePlannerSelections } from "../utils/scheduler";
+import { checkBeatConflicts, getBeatProgress, mergePlannerSelections } from "../utils/scheduler";
 import { addMinutes, getTimeSlots, getWeekDates, id, normalizeWeekStart, timeToMinutes } from "../utils/time";
 import { getBeatAvailability, isSlotBlocked } from "../utils/availability";
 import type { PlannerBlockout, PlannerSelection, ScheduledBlock } from "../types";
@@ -40,16 +40,12 @@ export default function PlannerPage({ onNavigate }: { onNavigate: (page: string)
   function toggleSelection(selection: PlannerSelection) {
     setState((current) => {
       const exists = current.plannerSelections.some((item) => item.date === selection.date && item.startTime === selection.startTime && item.laneId === selection.laneId && item.beatId === selection.beatId);
-      if (!exists && isSlotBlocked(selection.date, selection.startTime, addMinutes(selection.startTime, current.settings.plannerSlotMinutes), selection.laneId, current)) return current;
+      const selectedBeat = current.beats.find((beat) => beat.id === selection.beatId);
+      if (!exists && !selectedBeat) return current;
       const sameTime = current.plannerSelections.filter((item) => item.date === selection.date && item.startTime === selection.startTime);
       const lanesInUse = new Set(sameTime.map((item) => item.laneId));
       if (!exists && !lanesInUse.has(selection.laneId) && lanesInUse.size >= current.settings.maxParallelBlocks) return current;
-      const selectedBeat = current.beats.find((beat) => beat.id === selection.beatId);
-      const selectedActors = new Set(selectedBeat?.rosterActorIds ?? []);
-      const actorsBookedElsewhere = sameTime
-        .filter((item) => item.laneId !== selection.laneId)
-        .flatMap((item) => current.beats.find((beat) => beat.id === item.beatId)?.rosterActorIds ?? []);
-      if (!exists && actorsBookedElsewhere.some((actorId) => selectedActors.has(actorId))) return current;
+      if (!exists && selectedBeat && !checkBeatConflicts(selectedBeat, selection.date, selection.startTime, addMinutes(selection.startTime, current.settings.plannerSlotMinutes), selection.laneId, current).canSchedule) return current;
       return { ...current, plannerSelections: exists ? current.plannerSelections.filter((item) => !(item.date === selection.date && item.startTime === selection.startTime && item.laneId === selection.laneId && item.beatId === selection.beatId)) : [...current.plannerSelections, selection] };
     });
   }
@@ -65,12 +61,12 @@ export default function PlannerPage({ onNavigate }: { onNavigate: (page: string)
     return state.beats
       .map((beat) => {
         const blocked = slots.some((time) => isSlotBlocked(range.date, time, addMinutes(time, state.settings.plannerSlotMinutes), range.laneId, state));
-        const checks = slots.map((time) => getBeatAvailability(beat.id, range.date, time, state));
-        const firstFail = checks.find((check) => !check.canRehearse);
+        const checks = slots.map((time) => checkBeatConflicts(beat, range.date, time, addMinutes(time, state.settings.plannerSlotMinutes), range.laneId, state));
+        const firstFail = checks.find((check) => !check.canSchedule);
         return {
           beat,
           canRehearse: !blocked && !firstFail,
-          reason: blocked ? "Range includes break or blackout" : firstFail?.reason ?? "Available for whole range",
+          reason: blocked ? "Range includes break or blackout" : firstFail?.conflicts.map((conflict) => `${conflict.actorName ?? "Schedule"}: ${conflict.reason}`).join(", ") ?? "Available for whole range",
         };
       });
   }
@@ -79,7 +75,12 @@ export default function PlannerPage({ onNavigate }: { onNavigate: (page: string)
     if (!range || !rangeBeatIds.length) return;
     const slots = rangeSlots();
     setState((current) => {
-      const additions = slots.flatMap((startTime) => rangeBeatIds.map((beatId) => ({ date: range.date, startTime, laneId: range.laneId, beatId })));
+      const additions = slots.flatMap((startTime) => rangeBeatIds
+        .filter((beatId) => {
+          const beat = current.beats.find((candidate) => candidate.id === beatId);
+          return Boolean(beat && checkBeatConflicts(beat, range.date, startTime, addMinutes(startTime, current.settings.plannerSlotMinutes), range.laneId, current).canSchedule);
+        })
+        .map((beatId) => ({ date: range.date, startTime, laneId: range.laneId, beatId })));
       const keys = new Set(additions.map((selection) => `${selection.date}|${selection.startTime}|${selection.laneId}|${selection.beatId}`));
       const filtered = current.plannerSelections.filter((selection) => !keys.has(`${selection.date}|${selection.startTime}|${selection.laneId}|${selection.beatId}`));
       return { ...current, plannerSelections: [...filtered, ...additions] };
