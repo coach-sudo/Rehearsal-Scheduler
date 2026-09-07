@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Local Netlify state
+.netlify/
+
+# Logs
+*.log
+vite-err.log
+vite-out.log
+
+# TypeScript incremental cache
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Local environment files
+.env
+.env.*
+!.env.example
