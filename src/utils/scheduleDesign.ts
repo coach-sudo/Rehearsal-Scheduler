@@ -512,9 +512,8 @@ function renderWeeklyGrid(state: AppState, design: ScheduleDesignSettings) {
   const end = timeToMinutes(range.end);
   const total = Math.max(1, end - start);
   const ticks = inclusiveTimeMarkers(start, end, 30);
-  const hasCallKey = design.showActorNames || design.showCharacterNames || design.showConflicts || design.showNotes;
 
-  return `<section class="weekly-engine ${hasCallKey ? "has-call-key" : ""}" style="${typographyVariables(design)};--day-count:${Math.max(1, dates.length)}">
+  return `<section class="weekly-engine" style="${typographyVariables(design)};--day-count:${Math.max(1, dates.length)}">
     <div class="pro-grid">
       <div class="grid-corner">${escapeHtml(design.timeLabel || "Time")}</div>
       <div class="grid-day-heads">
@@ -531,7 +530,6 @@ function renderWeeklyGrid(state: AppState, design: ScheduleDesignSettings) {
         ${blocks.map((block, index) => renderProportionalGridBlock(block, state, design, index, dates, start, total)).join("")}
       </div>
     </div>
-    ${hasCallKey ? renderWeeklyCallKey(blocks, state, design) : ""}
   </section>`;
 }
 
@@ -547,33 +545,18 @@ function renderProportionalGridBlock(block: ScheduledBlock, state: AppState, des
   const color = blockTypeColor(block, state, design);
   const title = beatTitles(block, state) || block.customTitle || "Call";
   const room = block.location || block.laneId;
+  const isGeneralCall = !block.beatIds.length && (block.blockType === "break" || block.blockType === "lunch");
+  const showActors = design.showActorNames && !isGeneralCall;
   return `<article class="grid-call-block ${design.blockStyle}" style="left:calc(${left}% + 2px);top:${top}%;width:calc(${laneWidth}% - 4px);height:${height}%;--block-color:${color}">
     <span class="grid-call-number">${index + 1}</span>
-    <strong>${escapeHtml(title)}</strong>
     <span class="grid-call-time">${escapeHtml(formatScheduleTime(block.startTime, design))}-${escapeHtml(formatScheduleTime(block.endTime, design))}</span>
+    <strong>${escapeHtml(title)}</strong>
     ${design.showRoom || design.showLaneNames ? `<span class="grid-call-room">${escapeHtml(room)}</span>` : ""}
+    ${showActors ? `<span class="grid-call-actors"><b>${escapeHtml(design.calledLabel || "Called")}:</b> ${escapeHtml(actorNames(block, state) || "Cast TBD")}</span>` : ""}
+    ${design.showCharacterNames && block.beatIds.length ? `<span class="grid-call-detail"><b>${escapeHtml(design.charactersLabel || "Characters")}:</b> ${escapeHtml(characterNames(block, state) || "TBD")}</span>` : ""}
+    ${design.showNotes ? `<span class="grid-call-detail">${escapeHtml(blockFocus(block, state))}</span>` : ""}
+    ${design.showConflicts && block.conflicts.length ? `<em>${escapeHtml(block.conflicts.join("; "))}</em>` : ""}
   </article>`;
-}
-
-function renderWeeklyCallKey(blocks: ScheduledBlock[], state: AppState, design: ScheduleDesignSettings) {
-  return `<aside class="weekly-call-key">
-    <h2>${escapeHtml(design.calledLabel || "Called")}</h2>
-    <div class="key-list">
-      ${blocks.map((block, index) => {
-        const color = blockTypeColor(block, state, design);
-        const title = beatTitles(block, state) || block.customTitle || "Call";
-        const room = block.location || block.laneId;
-        return `<article class="key-item" style="--block-color:${color}">
-          <strong><span>${index + 1}</span>${escapeHtml(dayNames[getDayOfWeek(block.date)].slice(0, 3))} ${escapeHtml(formatScheduleTime(block.startTime, design))}-${escapeHtml(formatScheduleTime(block.endTime, design))}</strong>
-          <p>${escapeHtml(title)}${design.showRoom || design.showLaneNames ? ` | ${escapeHtml(room)}` : ""}</p>
-          ${design.showActorNames ? `<small><b>${escapeHtml(design.actorsLabel || "Actors")}:</b> ${escapeHtml(actorNames(block, state) || "Cast TBD")}</small>` : ""}
-          ${design.showCharacterNames && block.beatIds.length ? `<small><b>${escapeHtml(design.charactersLabel || "Characters")}:</b> ${escapeHtml(characterNames(block, state) || "Characters TBD")}</small>` : ""}
-          ${design.showNotes ? `<small>${escapeHtml(blockFocus(block, state))}</small>` : ""}
-          ${design.showConflicts && block.conflicts.length ? `<em>${escapeHtml(block.conflicts.join("; "))}</em>` : ""}
-        </article>`;
-      }).join("")}
-    </div>
-  </aside>`;
 }
 
 function orderedScheduleDates(state: AppState, blocks: ScheduledBlock[]) {
@@ -755,7 +738,7 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
   const tableText = Math.max(8.5, onePage ? minText - 1 : Math.max(minText - 1, design.density < 35 ? 9 : 10.5));
   const detailText = Math.max(9, onePage ? minText : Math.max(minText, design.density < 35 ? 10 : 12));
   const microText = Math.max(8, onePage ? minText - 1.25 : minText - 1.5);
-  return `
+  const baseStyles = `
     @page{size:${design.paperSize} ${design.orientation};margin:0}
     body{margin:0;background:#dfe4dd;color:${ink};font-family:${fonts.body};font-size:${minText}px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .schedule-paper{width:${page.width};height:${page.height};margin:20px auto;padding:${pad};background:${bg};box-shadow:0 18px 60px rgba(15,23,42,.18);box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;page-break-before:avoid;page-break-after:avoid;page-break-inside:avoid}
@@ -786,6 +769,21 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
     @media screen and (max-width:700px){.schedule-paper{zoom:.48}}
     @media print{.no-print,nav,aside{display:none!important}html,body{margin:0;padding:0;background:white;width:100%;height:100%}.print-wrapper{position:relative;top:0;left:0;transform:none!important;box-shadow:none!important;page-break-before:avoid;page-break-after:avoid;page-break-inside:avoid}.schedule-paper{box-shadow:none;margin:0;break-after:page}.schedule-paper:last-child{break-after:auto}.schedule-block,.call-row,.parent-call,.work-card,.visual-day,.digital-day,.beat-day-card,.run-strip-item,.timeline-day-row,.grid-call-block,.key-item{break-inside:avoid}*{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;color-adjust:exact!important}}
   `;
+  const weeklyGridStyles = `
+    /* The Weekly Grid is a self-contained schedule: called actors belong in
+       the matching colored block, never in a space-consuming side legend. */
+    .weekly-engine,.weekly-engine.has-call-key{grid-template-columns:minmax(0,1fr)}
+    .grid-call-block{padding:${onePage ? "3px 4px" : "5px 6px"};overflow:hidden;line-height:1.1}
+    .grid-call-block strong{padding-right:15px;font-size:${Math.max(8.5, minText - 1)}px;line-height:1.1;overflow-wrap:anywhere}
+    .grid-call-block span{display:block}
+    .grid-call-time{font-size:${microText}px;font-weight:var(--time-weight,850);color:var(--block-color);white-space:nowrap;text-align:var(--time-align,left)}
+    .grid-call-room{font-size:${Math.max(7.5, microText - .35)}px;text-align:var(--actor-align,left);font-weight:750;opacity:.76;white-space:normal;overflow-wrap:anywhere}
+    .grid-call-actors,.grid-call-detail{margin-top:1px;font-size:${Math.max(7.2, microText - .55)}px;line-height:1.12;text-align:var(--actor-align,left);overflow-wrap:anywhere}
+    .grid-call-actors b{font-weight:var(--actor-weight,850)}
+    .grid-call-detail{opacity:.8}
+    .grid-call-block em{display:block;margin-top:1px;font-size:${Math.max(7, microText - .8)}px;line-height:1.1;color:#b42318;font-style:normal;font-weight:800;overflow-wrap:anywhere}
+  `;
+  return `${baseStyles}${weeklyGridStyles}`;
 }
 
 function layoutFor(block: ScheduledBlock, state: AppState, design: ScheduleDesignSettings, index = 0) {
