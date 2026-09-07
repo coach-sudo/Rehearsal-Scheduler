@@ -539,19 +539,24 @@ function renderWeeklyGrid(state: AppState, design: ScheduleDesignSettings) {
 
 function renderProportionalGridBlock(block: ScheduledBlock, state: AppState, design: ScheduleDesignSettings, index: number, dates: string[], gridStart: number, total: number) {
   const dateIndex = Math.max(0, dates.indexOf(block.date));
-  const lanes = activeLanesForDate(block.date, state.scheduledBlocks);
+  // A lane only takes horizontal space while it is actually competing with
+  // another lane. This keeps ordinary calls full-width while preserving a
+  // clear side-by-side view for genuinely simultaneous rehearsals.
+  const lanes = activeLanesForBlock(block, state.scheduledBlocks);
   const laneIndex = Math.max(0, lanes.indexOf(block.laneId));
   const dayWidth = 100 / Math.max(1, dates.length);
   const laneWidth = dayWidth / Math.max(1, lanes.length);
-  const top = ((timeToMinutes(block.startTime) - gridStart) / total) * 100;
-  const height = ((timeToMinutes(block.endTime) - timeToMinutes(block.startTime)) / total) * 100;
+  const rawTop = ((timeToMinutes(block.startTime) - gridStart) / total) * 100;
+  const rawHeight = ((timeToMinutes(block.endTime) - timeToMinutes(block.startTime)) / total) * 100;
+  const top = Math.max(0, Math.min(100, rawTop));
+  const height = Math.max(0.1, Math.min(100 - top, rawHeight));
   const left = dateIndex * dayWidth + laneIndex * laneWidth;
   const color = blockTypeColor(block, state, design);
   const title = beatTitles(block, state) || block.customTitle || "Call";
   const room = block.location || block.laneId;
   const isGeneralCall = !block.beatIds.length && (block.blockType === "break" || block.blockType === "lunch");
   const showActors = design.showActorNames && !isGeneralCall;
-  return `<article class="grid-call-block ${design.blockStyle}" style="left:calc(${left}% + 2px);top:${top}%;width:calc(${laneWidth}% - 4px);height:${height}%;--block-color:${color}">
+  return `<article class="grid-call-block ${design.blockStyle}" style="left:calc(${left}% + 2px);top:calc(${top}% + 2px);width:calc(${laneWidth}% - 4px);height:calc(${height}% - 4px);--block-color:${color}">
     <span class="grid-call-number">${index + 1}</span>
     <span class="grid-call-time">${escapeHtml(formatScheduleTime(block.startTime, design))} - ${escapeHtml(formatScheduleTime(block.endTime, design))}</span>
     <strong>${escapeHtml(title)}</strong>
@@ -588,9 +593,16 @@ function inclusiveTimeMarkers(start: number, end: number, step: number) {
   return markers;
 }
 
-function activeLanesForDate(date: string, blocks: ScheduledBlock[]) {
-  const lanes = unique(blocks.filter((block) => block.date === date).map((block) => block.laneId)).sort();
-  return lanes.length ? lanes : ["Main"];
+function activeLanesForBlock(block: ScheduledBlock, blocks: ScheduledBlock[]) {
+  const start = timeToMinutes(block.startTime);
+  const end = timeToMinutes(block.endTime);
+  const lanes = unique(
+    blocks
+      .filter((candidate) => candidate.date === block.date)
+      .filter((candidate) => timeToMinutes(candidate.startTime) < end && timeToMinutes(candidate.endTime) > start)
+      .map((candidate) => candidate.laneId),
+  ).sort();
+  return lanes.length ? lanes : [block.laneId || "Main"];
 }
 
 function renderRoomMatrix(state: AppState, design: ScheduleDesignSettings) {
@@ -776,7 +788,7 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
   const weeklyGridStyles = `
     /* The Weekly Grid is a self-contained schedule: called actors belong in
        the matching colored block, never in a space-consuming side legend. */
-    .weekly-engine,.weekly-engine.has-call-key{grid-template-columns:minmax(0,1fr)}
+    .weekly-engine,.weekly-engine.has-call-key{grid-template-columns:minmax(0,1fr);flex:1 1 0;min-height:0}
     .weekly-engine .pro-grid{grid-template-columns:${onePage ? ".78in" : ".86in"} minmax(0,1fr);contain:layout paint}
     .weekly-call-key{display:none!important}
     .grid-call-block{padding:${onePage ? "3px 4px" : "5px 6px"};overflow:hidden;line-height:1.1;contain:layout paint}
