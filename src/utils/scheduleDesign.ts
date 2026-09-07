@@ -153,8 +153,8 @@ function contentFitScale(state: AppState, design: ScheduleDesignSettings) {
     Number(design.showRoom || design.showLaneNames) +
     Number(design.showNotes) +
     Number(design.showConflicts);
-  const blockPressure = design.renderMode === "weeklyGrid" ? blocks.length / 24 : blocks.length / 20;
-  const dayPressure = design.renderMode === "weeklyGrid" ? maxDayBlocks / 7 : maxDayBlocks / 5;
+  const blockPressure = design.template === "weeklyGrid" ? blocks.length / 24 : blocks.length / 20;
+  const dayPressure = design.template === "weeklyGrid" ? maxDayBlocks / 7 : maxDayBlocks / 5;
   const detailPressure = detailWeight * 0.045;
   // Larger type needs a little more room. The content still fits the selected
   // paper target, but the designer's type scale remains visibly responsive.
