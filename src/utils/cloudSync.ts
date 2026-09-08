@@ -63,12 +63,12 @@ export async function signInDirector(email: string, password: string) {
   return login(email.trim(), password);
 }
 
-export async function createDirectorAccount(email: string, password: string, name: string) {
+export async function createDirectorAccount(email: string, password: string) {
   const response = await fetch("/.netlify/functions/signup", {
     method: "POST",
     credentials: "include",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: email.trim(), password, name: name.trim() || email.trim() }),
+    body: JSON.stringify({ email: email.trim(), password }),
   });
   if (!response.ok) {
     const message = await responseErrorMessage(response);

@@ -1,6 +1,6 @@
 import { useAppState } from "../App";
 import StatusBadge from "../components/StatusBadge";
-import { createLogEntries } from "../utils/scheduler";
+import { createLogEntries, getBlockConflicts } from "../utils/scheduler";
 import { addDays, formatTime, dayNames, getDayOfWeek, normalizeWeekStart } from "../utils/time";
 import { useState } from "react";
 
@@ -10,11 +10,17 @@ export default function SchedulePage({ onNavigate }: { onNavigate?: (page: strin
   const [viewWeek, setViewWeek] = useState(state.settings.weekStartDate);
 
   function saveWeek() {
-    const entries = createLogEntries(state.scheduledBlocks);
+    const reviewedBlocks = state.scheduledBlocks.map((block) => ({ ...block, conflicts: getBlockConflicts(block, state) }));
+    if (reviewedBlocks.some((block) => block.conflicts.length)) {
+      setState((current) => ({ ...current, scheduledBlocks: reviewedBlocks }));
+      window.alert("This schedule has unavailable actors or one-off conflicts. Resolve the highlighted calls before saving the week.");
+      return;
+    }
+    const entries = createLogEntries(reviewedBlocks);
     setState((current) => {
       const existing = new Set(current.scheduleLog.map((entry) => `${entry.scheduledBlockId}|${entry.beatId}|${entry.date}|${entry.startTime}|${entry.endTime}|${entry.laneId}`));
       const newEntries = entries.filter((entry) => !existing.has(`${entry.scheduledBlockId}|${entry.beatId}|${entry.date}|${entry.startTime}|${entry.endTime}|${entry.laneId}`));
-      return { ...current, scheduleLog: [...current.scheduleLog, ...newEntries] };
+      return { ...current, scheduledBlocks: reviewedBlocks, scheduleLog: [...current.scheduleLog, ...newEntries] };
     });
   }
 

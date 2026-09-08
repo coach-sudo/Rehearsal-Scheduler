@@ -85,6 +85,12 @@ export const fontPairings = {
   modern: { label: "Modern: Poppins / DM Sans", heading: "Poppins, Inter, Arial, sans-serif", body: "'DM Sans', Inter, Arial, sans-serif" },
   film: { label: "Film: Roboto Condensed", heading: "'Arial Narrow', Arial, sans-serif", body: "'Arial Narrow', Arial, sans-serif" },
   youth: { label: "Youth: Nunito", heading: "Nunito, Inter, Arial, sans-serif", body: "Nunito, Inter, Arial, sans-serif" },
+  editorial: { label: "Editorial: Baskerville / Aptos", heading: "Baskerville, Georgia, serif", body: "Aptos, Arial, sans-serif" },
+  friendly: { label: "Friendly: Trebuchet", heading: "'Trebuchet MS', Arial, sans-serif", body: "'Trebuchet MS', Arial, sans-serif" },
+  humanist: { label: "Humanist: Gill Sans / Verdana", heading: "'Gill Sans', 'Trebuchet MS', sans-serif", body: "Verdana, Arial, sans-serif" },
+  condensed: { label: "Condensed: Arial Narrow", heading: "'Arial Narrow', Arial, sans-serif", body: "'Arial Narrow', Arial, sans-serif" },
+  typewriter: { label: "Typewriter: Courier", heading: "'Courier New', monospace", body: "'Courier New', monospace" },
+  clean: { label: "Clean: Arial", heading: "Arial, Helvetica, sans-serif", body: "Arial, Helvetica, sans-serif" },
 } as const;
 
 export function sortedBlocks(blocks: ScheduledBlock[]) {
@@ -380,7 +386,8 @@ function renderPageLogo(design: ScheduleDesignSettings) {
   // allow a director to use the very top/edge of the printable paper.
   const x = Math.max(-20, Math.min(100, design.logoX ?? 78));
   const y = Math.max(-20, Math.min(100, design.logoY ?? 2));
-  return `<img class="logo page-logo" data-page-logo="true" src="${design.logoDataUrl}" alt="" style="left:${x}%;top:${y}%">`;
+  const size = Math.max(24, Math.min(480, design.logoSize || 88));
+  return `<div class="logo page-logo" data-page-logo="true" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px"><img src="${design.logoDataUrl}" alt=""><span class="logo-resize-handle" data-logo-resize="true" aria-hidden="true"></span></div>`;
 }
 
 function directorEntries(design: ScheduleDesignSettings) {
@@ -435,10 +442,9 @@ function renderBeatDayCard(block: ScheduledBlock, state: AppState, design: Sched
     <div class="card-time">${escapeHtml(formatScheduleTime(block.startTime, design))} - ${escapeHtml(formatScheduleTime(block.endTime, design))}${design.showDurations ? ` | ${escapeHtml(durationLabel(block))}` : ""}</div>
     <div class="card-body"><h3>${design.showIcons ? `${escapeHtml(iconForBlock(block, state))} ` : ""}${escapeHtml(beatTitles(block, state) || "Untitled rehearsal")}</h3>
     ${showRoom ? `<div class="card-room">${escapeHtml(block.location || block.laneId)}</div>` : ""}
-    ${showActors ? `<p class="called-names"><strong class="called-label">${escapeHtml(design.calledLabel || "Called")}:</strong> <span class="actor-value">${escapeHtml(actorNames(block, state) || "Cast TBD")}</span></p>` : ""}
+    ${showActors ? `<p class="called-names"><span class="actor-value">${escapeHtml(actorNames(block, state) || "Cast TBD")}</span></p>` : ""}
     ${design.showCharacterNames && block.beatIds.length ? `<p><strong>${escapeHtml(design.charactersLabel || "Characters")}:</strong> ${escapeHtml(characterNames(block, state) || "Characters TBD")}</p>` : ""}
     ${design.showNotes ? `<small>${escapeHtml(blockFocus(block, state))}</small>` : ""}
-    ${design.showRehearsalNumbers && block.beatIds.length ? `<small>Rehearsal #${index + 1}</small>` : ""}
     ${design.showConflicts && block.conflicts.length ? `<em>${escapeHtml(block.conflicts.join("; "))}</em>` : ""}
     </div>
   </article>`;
@@ -602,11 +608,10 @@ function renderProportionalGridBlock(block: ScheduledBlock, state: AppState, des
   const showActors = design.showActorNames && !isGeneralCall;
   const safeTextSize = safeBlockTextSize(block, design, showActors, isGeneralCall, lanes.length);
   return `<article data-block-id="${escapeHtml(block.id)}" data-max-text-size="${safeTextSize}" class="grid-call-block ${design.blockStyle}" style="left:calc(${left}% + 2px);top:calc(${top}% + 2px);width:calc(${laneWidth}% - 4px);height:calc(${height}% - 4px);--block-color:${color};--block-font-size:${safeTextSize}px">
-    <span class="grid-call-number">${index + 1}</span>
     <span class="grid-call-time">${escapeHtml(formatScheduleTime(block.startTime, design))} - ${escapeHtml(formatScheduleTime(block.endTime, design))}</span>
     <strong>${escapeHtml(title)}</strong>
     ${design.showRoom || design.showLaneNames ? `<span class="grid-call-room">${escapeHtml(room)}</span>` : ""}
-    ${showActors ? `<span class="grid-call-actors"><b>${escapeHtml(design.calledLabel || "Called")}:</b> ${escapeHtml(actorNames(block, state) || "Cast TBD")}</span>` : ""}
+    ${showActors ? `<span class="grid-call-actors">${escapeHtml(actorNames(block, state) || "Cast TBD")}</span>` : ""}
     ${design.showCharacterNames && block.beatIds.length ? `<span class="grid-call-detail"><b>${escapeHtml(design.charactersLabel || "Characters")}:</b> ${escapeHtml(characterNames(block, state) || "TBD")}</span>` : ""}
     ${design.showNotes ? `<span class="grid-call-detail">${escapeHtml(blockFocus(block, state))}</span>` : ""}
     ${design.showConflicts && block.conflicts.length ? `<em>${escapeHtml(block.conflicts.join("; "))}</em>` : ""}
@@ -655,12 +660,12 @@ function safeBlockTextSize(block: ScheduledBlock, design: ScheduleDesignSettings
     + Number(design.showConflicts && block.conflicts.length);
   // A short call has a physically limited printed area. This conservative cap
   // keeps user-selected type inside that area instead of clipping the card.
-  const capacity = Math.floor((duration * 1.6) / Math.max(2, detailLines));
+  const capacity = Math.floor((duration * 2.5) / Math.max(2, detailLines));
   // More actors and simultaneous lanes create more wrapped lines. Lower the
   // cap before the content reaches the card edge rather than clipping it.
-  const actorPenalty = showActors ? Math.max(0, block.actorIds.length - 2) : 0;
+  const actorPenalty = showActors ? Math.max(0, block.actorIds.length - 3) : 0;
   const lanePenalty = Math.max(0, concurrentLaneCount - 1) * 2;
-  const cap = Math.max(7, Math.min(28, capacity - actorPenalty - lanePenalty));
+  const cap = Math.max(8, Math.min(28, capacity - actorPenalty - lanePenalty));
   return Math.max(8, Math.min(requested, cap));
 }
 
@@ -805,6 +810,9 @@ function typographyVariables(design: ScheduleDesignSettings) {
 }
 
 function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { heading: string; body: string }) {
+  const headerFont = fontPairings[design.headerFont ?? design.fontPairing]?.heading ?? fonts.heading;
+  const titleFont = fontPairings[design.titleFont ?? design.fontPairing]?.heading ?? fonts.heading;
+  const bodyFont = fontPairings[design.bodyFont ?? design.fontPairing]?.body ?? fonts.body;
   const page = pageSize(design);
   const blocks = sortedBlocks(state.scheduledBlocks);
   const dates = unique(blocks.map((block) => block.date));
@@ -833,12 +841,12 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
   const microText = Math.max(8, onePage ? minText - 1.25 : minText - 1.5);
   const baseStyles = `
     @page{size:${design.paperSize} ${design.orientation};margin:0}
-    body{margin:0;background:#dfe4dd;color:${ink};font-family:${fonts.body};font-size:${minText}px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.preview-selection{outline:2px solid #0b78d0!important;outline-offset:1px;cursor:pointer}
+    body{margin:0;background:#dfe4dd;color:${ink};font-family:${bodyFont};font-size:${minText}px;-webkit-print-color-adjust:exact;print-color-adjust:exact}.preview-selection{outline:2px solid #0b78d0!important;outline-offset:1px;cursor:pointer}
     .schedule-paper{position:relative;width:${page.width};height:${page.height};margin:20px auto;padding:${pad};background:${bg};box-shadow:0 18px 60px rgba(15,23,42,.18);box-sizing:border-box;overflow:hidden;display:flex;flex-direction:column;page-break-before:avoid;page-break-after:avoid;page-break-inside:avoid}
     .schedule-content{flex:1 1 auto;min-height:0;height:100%;overflow:hidden;position:relative}
     .scaled-content{width:var(--content-width);height:calc(100% / var(--content-scale));min-height:0;overflow:hidden;transform:scale(var(--content-scale));transform-origin:top left}
-    h1,h2,h3{font-family:${fonts.heading};margin:0;overflow-wrap:anywhere}.eyebrow{font-size:${microText}px;text-transform:uppercase;letter-spacing:.08em;opacity:.68}.subtitle{font-size:${minText}px;opacity:.82;margin-top:2px;white-space:normal;overflow-wrap:anywhere}.template-purpose{font-size:${microText}px;opacity:.72;margin-top:3px}
-    h1{font-size:${onePage ? "19px" : design.spacing === "compact" ? "20px" : design.spacing === "large" ? "28px" : "24px"};line-height:1.02}.logo{width:${Math.max(24, Math.min(320, design.logoSize))}px;height:${Math.max(24, Math.min(320, design.logoSize))}px;object-fit:contain;z-index:30;pointer-events:auto}.page-logo{position:absolute;cursor:grab;user-select:none;touch-action:none}.page-logo:active{cursor:grabbing}.notes{margin-top:2px;font-size:${microText}px;opacity:.84;line-height:1.16}.director-contact{font-weight:750}.director-details{display:grid;gap:1px;margin-top:2px}
+    h1,h2,h3,.block-title,.beat-day-card h3,.grid-call-block strong{font-family:${titleFont};margin:0;overflow-wrap:anywhere}.header,.header h1,.header h2,.header .eyebrow,.header .subtitle{font-family:${headerFont}}.eyebrow{font-size:${microText}px;text-transform:uppercase;letter-spacing:.08em;opacity:.68}.subtitle{font-size:${minText}px;opacity:.82;margin-top:2px;white-space:normal;overflow-wrap:anywhere}.template-purpose{font-size:${microText}px;opacity:.72;margin-top:3px}
+    h1{font-size:${onePage ? "19px" : design.spacing === "compact" ? "20px" : design.spacing === "large" ? "28px" : "24px"};line-height:1.02}.logo{box-sizing:border-box;z-index:30;pointer-events:auto}.page-logo{position:absolute;cursor:grab;user-select:none;touch-action:none}.page-logo>img{width:100%;height:100%;object-fit:contain;display:block}.page-logo:active{cursor:grabbing}.logo-resize-handle{position:absolute;right:-5px;bottom:-5px;width:13px;height:13px;border:2px solid white;border-radius:2px;background:${design.accentColor};box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:nwse-resize;touch-action:none}.notes{margin-top:2px;font-size:${microText}px;opacity:.84;line-height:1.16}.director-contact{font-weight:750}.director-details{display:grid;gap:1px;margin-top:2px}
     .header{position:relative;flex:0 0 auto;border-bottom:2px solid ${design.accentColor};padding-bottom:${onePage ? "4px" : "8px"};margin-bottom:${onePage ? "5px" : "9px"};min-height:0}.header-copy{min-width:0}.header.ribbon{background:${design.accentColor};color:white;margin:-${pad} -${pad} ${onePage ? "5px" : "9px"};padding:${onePage ? "0.17in" : pad} ${pad} ${onePage ? "5px" : "10px"}}.header.marquee{border:2px double ${design.accentColor};padding:${onePage ? "5px" : "9px"};text-align:center}.header.banner{background:${design.primaryColor};color:white;border:0;padding:${onePage ? "5px" : "10px"} ${pad};margin:-${pad} -${pad} ${onePage ? "5px" : "9px"}}.header.callsheet{border:1px solid ${design.primaryColor};padding:${onePage ? "5px" : "8px"};text-transform:uppercase}.header.divider{border-bottom:3px solid ${design.accentColor}}
     .day-section{break-inside:${design.keepDaysTogether ? "avoid" : "auto"};page-break-inside:${design.keepDaysTogether ? "avoid" : "auto"};margin:0 0 14px}.day-section h2{font-size:16px;margin-bottom:7px;color:${ink}}
     .block-list{display:grid;gap:7px}.timeline{border-left:2px solid ${design.accentColor};padding-left:12px;display:grid;gap:7px}.schedule-block{break-inside:${design.avoidSplittingBlocks ? "avoid" : "auto"};border-left:7px solid var(--block-color);margin:0;padding:${blockPad};background:${dark ? "#1f2937" : "#fff"};border-radius:8px;border-top:1px solid ${dark ? "#334155" : "#e6e1d8"};border-right:1px solid ${dark ? "#334155" : "#e6e1d8"};border-bottom:1px solid ${dark ? "#334155" : "#e6e1d8"}}
@@ -868,12 +876,11 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
     .weekly-call-key{display:none!important}
     .grid-day-head{align-items:var(--day-cell-align,center);justify-items:center}
     .grid-call-block{display:flex;flex-direction:column;justify-content:var(--beat-cell-align,var(--cell-content-align,flex-start));padding:${densityPad};overflow:hidden;line-height:1.1;contain:layout paint}
-    .grid-call-block strong{padding-right:15px;font-size:calc(var(--block-font-size, ${Math.max(8, Math.min(11.5, minText - 1 + densityRatio * 1.2))}px) + 1px);line-height:1.05;overflow-wrap:anywhere}
+    .grid-call-block strong{padding-right:0;font-size:calc(var(--block-font-size, ${Math.max(8, Math.min(11.5, minText - 1 + densityRatio * 1.2))}px) + 1px);line-height:1.05;overflow-wrap:anywhere}
     .grid-call-block span{display:block}
     .grid-call-time{font-size:calc(var(--block-font-size, ${Math.max(8, Math.min(9.5, microText))}px) - 1px);font-weight:var(--time-weight,850);color:var(--block-color);white-space:normal;overflow-wrap:normal;text-align:var(--time-align,left)}
     .grid-call-room{font-size:calc(var(--block-font-size, ${gridDetailSize}px) - 1px);text-align:var(--actor-align,left);font-weight:750;opacity:.76;white-space:normal;overflow-wrap:anywhere}
     .grid-call-actors,.grid-call-detail{margin-top:${Math.round(1 + densityRatio * 2)}px;font-size:calc(var(--block-font-size, ${gridDetailSize}px) - 1px);line-height:1.08;text-align:var(--actor-align,left);overflow-wrap:anywhere}
-    .grid-call-actors b{font-weight:var(--actor-weight,850)}
     .grid-call-detail{opacity:.8}
     .grid-call-block em{display:block;margin-top:1px;font-size:${Math.max(7, microText - .8)}px;line-height:1.1;color:#b42318;font-style:normal;font-weight:800;overflow-wrap:anywhere}
   `;

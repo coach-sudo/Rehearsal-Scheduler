@@ -1,9 +1,21 @@
+import { useEffect, useState } from "react";
 import { useAppState } from "../App";
 import { createBlankState } from "../utils/storage";
 
 export default function SettingsPage() {
   const { state, setState } = useAppState();
   const settings = state.settings;
+  const [laneText, setLaneText] = useState(settings.lanes.join(", "));
+
+  useEffect(() => {
+    setLaneText(settings.lanes.join(", "));
+  }, [settings.lanes]);
+
+  function saveLanes(value = laneText) {
+    const lanes = value.split(",").map((lane) => lane.trim()).filter(Boolean);
+    if (!lanes.length) return;
+    setState((current) => ({ ...current, settings: { ...current.settings, lanes } }));
+  }
   return (
     <section>
       <h2 className="text-2xl font-semibold">Settings</h2>
@@ -17,7 +29,7 @@ export default function SettingsPage() {
           <label className="text-sm font-medium">Max absences allowed<input type="number" min={0} value={settings.maxAbsencesAllowed} onChange={(event) => setState((current) => ({ ...current, settings: { ...current.settings, maxAbsencesAllowed: Number(event.target.value) } }))} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
           <label className="text-sm font-medium">Max parallel blocks<input type="number" min={1} max={3} value={settings.maxParallelBlocks} onChange={(event) => setState((current) => ({ ...current, settings: { ...current.settings, maxParallelBlocks: Number(event.target.value) } }))} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
         </div>
-        <label className="mt-4 block text-sm font-medium">Lanes, comma separated<input value={settings.lanes.join(", ")} onChange={(event) => setState((current) => ({ ...current, settings: { ...current.settings, lanes: event.target.value.split(",").map((lane) => lane.trim()).filter(Boolean) } }))} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
+        <label className="mt-4 block text-sm font-medium">Lanes, comma separated<input value={laneText} onChange={(event) => setLaneText(event.target.value)} onBlur={() => saveLanes()} onKeyDown={(event) => { if (event.key === "Enter") { event.currentTarget.blur(); } }} className="mt-1 block w-full rounded border border-line px-3 py-2" /><span className="mt-1 block text-xs font-normal text-stone-500">Type naturally, then press Enter or click away to apply your lane names.</span></label>
         <div className="mt-6 border-t border-line pt-4">
           <h3 className="font-semibold">Weekly schedule export</h3>
           <div className="mt-3 grid gap-3 md:grid-cols-2">

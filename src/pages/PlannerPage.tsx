@@ -290,6 +290,16 @@ export default function PlannerPage({ onNavigate }: { onNavigate: (page: string)
   }
 
   function buildCalendar() {
+    const invalidSelections = state.plannerSelections.flatMap((selection) => {
+      const beat = state.beats.find((candidate) => candidate.id === selection.beatId);
+      if (!beat) return [`Missing beat in ${selection.date} at ${selection.startTime}`];
+      const check = checkBeatConflicts(beat, selection.date, selection.startTime, addMinutes(selection.startTime, state.settings.plannerSlotMinutes), selection.laneId, state);
+      return check.canSchedule ? [] : [`${beat.title} on ${selection.date} at ${selection.startTime}: ${check.conflicts.map((conflict) => conflict.actorName ?? conflict.reason).join(", ")}`];
+    });
+    if (invalidSelections.length) {
+      setSmartCreateMessage(`Calendar was not built because ${invalidSelections.length} selected slot${invalidSelections.length === 1 ? " is" : "s are"} no longer available. Remove or adjust the affected calls first.`);
+      return;
+    }
     const blocks = mergePlannerSelections(state.plannerSelections, state);
     if (!blocks.length) return;
     if (blocks.some((block) => block.conflicts.length)) setPendingBlocks(blocks);

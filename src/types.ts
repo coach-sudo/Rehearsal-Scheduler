@@ -132,7 +132,7 @@ export type ScheduleTemplate =
   | "digital"
   | "vintage";
 
-export type FontPairing = "classic" | "theatrical" | "modern" | "film" | "youth";
+export type FontPairing = "classic" | "theatrical" | "modern" | "film" | "youth" | "editorial" | "friendly" | "humanist" | "condensed" | "typewriter" | "clean";
 export type BlockStyle = "rounded" | "sharp" | "sticky" | "outline" | "filled" | "minimal";
 export type HeaderStyle = "simple" | "marquee" | "callsheet" | "banner" | "divider" | "ribbon";
 export type ScheduleLayout = "stacked" | "timeline" | "cards" | "grid" | "matrix" | "table" | "calls";
@@ -180,6 +180,9 @@ export interface ScheduleDesignSettings {
   runColor: string;
   useRehearsalTypeColors: boolean;
   fontPairing: FontPairing;
+  headerFont: FontPairing;
+  titleFont: FontPairing;
+  bodyFont: FontPairing;
   blockStyle: BlockStyle;
   density: number;
   showActorNames: boolean;

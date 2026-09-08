@@ -13,7 +13,7 @@ import ScheduleDesignerPage from "./pages/ScheduleDesignerPage";
 import ProgressPage from "./pages/ProgressPage";
 import SettingsPage from "./pages/SettingsPage";
 import ImportExportPage from "./pages/ImportExportPage";
-import { loadState, normalizeState, SANDBOX_MODE_KEY, SANDBOX_STORAGE_KEY, saveState, STORAGE_KEY } from "./utils/storage";
+import { createBlankState, loadState, normalizeState, SANDBOX_MODE_KEY, SANDBOX_STORAGE_KEY, saveState, STORAGE_KEY } from "./utils/storage";
 import {
   cloudErrorMessage,
   createDirectorAccount,
@@ -29,6 +29,7 @@ import {
 } from "./utils/cloudSync";
 
 const CLIENT_ID_KEY = "rehearsal-scheduler-client-id";
+const LOCAL_PROJECT_OWNER_KEY = "rehearsal-scheduler-local-project-owner";
 
 interface AppContextValue {
   state: AppState;
@@ -88,6 +89,8 @@ export default function App() {
       if (remote.state) {
         const normalizedRemote = normalizeState(remote.state);
         setState(normalizedRemote);
+        stateRef.current = normalizedRemote;
+        localStorage.setItem(LOCAL_PROJECT_OWNER_KEY, cloudUserKey(user));
         lastCloudJson.current = JSON.stringify(normalizedRemote);
         lastCloudUpdatedAt.current = remote.updatedAt;
         setCloud({
@@ -98,8 +101,18 @@ export default function App() {
           lastLoadedAt: new Date().toISOString(),
         });
       } else {
-        const saved = await saveCloudProject(stateRef.current, clientId.current);
-        lastCloudJson.current = JSON.stringify(stateRef.current);
+        const owner = localStorage.getItem(LOCAL_PROJECT_OWNER_KEY);
+        // A first account may intentionally adopt the work already on this
+        // browser. A different account must start clean so projects cannot
+        // leak between directors sharing one device.
+        const initialProject = !owner || owner === cloudUserKey(user) ? stateRef.current : createBlankState();
+        if (initialProject !== stateRef.current) {
+          setState(initialProject);
+          stateRef.current = initialProject;
+        }
+        const saved = await saveCloudProject(initialProject, clientId.current);
+        localStorage.setItem(LOCAL_PROJECT_OWNER_KEY, cloudUserKey(user));
+        lastCloudJson.current = JSON.stringify(initialProject);
         lastCloudUpdatedAt.current = saved.updatedAt;
         setCloud({
           user,
@@ -231,10 +244,10 @@ export default function App() {
     }
   }
 
-  async function handleSignUp(email: string, password: string, name: string) {
+  async function handleSignUp(email: string, password: string) {
     setCloud((current) => ({ ...current, status: "loading", message: "Creating account" }));
     try {
-      const user = await createDirectorAccount(email, password, name);
+      const user = await createDirectorAccount(email, password);
       setPasswordRecoveryMode(false);
       await loadProjectForUser(user);
     } catch (error) {
@@ -321,8 +334,10 @@ export default function App() {
         if (remote.updatedBy === clientId.current) return;
         if (remote.updatedAt === lastCloudUpdatedAt.current) return;
 
-        setState(remote.state);
-        lastCloudJson.current = JSON.stringify(remote.state);
+        const normalizedRemote = normalizeState(remote.state);
+        setState(normalizedRemote);
+        stateRef.current = normalizedRemote;
+        lastCloudJson.current = JSON.stringify(normalizedRemote);
         lastCloudUpdatedAt.current = remote.updatedAt;
         setCloud((current) => ({
           ...current,
@@ -387,4 +402,8 @@ function getClientId() {
   const next = `client_${Math.random().toString(36).slice(2)}_${Date.now().toString(36)}`;
   localStorage.setItem(CLIENT_ID_KEY, next);
   return next;
+}
+
+function cloudUserKey(user: CloudStatus["user"]) {
+  return user?.id ?? user?.email ?? "unknown-user";
 }

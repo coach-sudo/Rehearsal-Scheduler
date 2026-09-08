@@ -138,6 +138,26 @@ export function getBlockConflicts(block: ScheduledBlock, state: AppState): strin
     timeCursor.push(addMinutes("00:00", minute));
   }
 
+  // A rehearsal is valid when each beat remains inside the director's allowed
+  // absence limit. Do not label a permitted absence as a calendar conflict.
+  if (block.beatIds.length) {
+    for (const time of timeCursor) {
+      block.beatIds.forEach((beatId) => {
+        const availability = getBeatAvailability(beatId, block.date, time, state);
+        if (availability.canRehearse) return;
+        availability.missingActors.forEach((actor) => {
+          const reason = availability.overrideConflicts.some((item) => item.id === actor.id) ? "unavailable override" : "not available";
+          conflicts.add(`${actor.name}: ${reason}`);
+        });
+        const beat = state.beats.find((candidate) => candidate.id === beatId);
+        beat?.rosterActorIds
+          .filter((actorId) => !state.actors.some((actor) => actor.id === actorId && actor.active))
+          .forEach((actorId) => conflicts.add(`${actorId}: missing or inactive actor`));
+      });
+    }
+    return [...conflicts];
+  }
+
   block.actorIds.forEach((actorId) => {
     const actor = state.actors.find((candidate) => candidate.id === actorId);
     const isMissing = timeCursor.some((time) => !isActorAvailable(actorId, block.date, time, state, { ignoreScheduledCalls: block.blockType === "custom" }));

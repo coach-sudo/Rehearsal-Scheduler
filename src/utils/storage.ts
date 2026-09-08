@@ -44,6 +44,10 @@ export function normalizeState(parsed: Partial<AppState>): AppState {
         fitBehaviorVersion: 4,
         designSystemVersion: 3,
         customCells: savedDesign?.customCells ?? demoState.settings.scheduleDesign.customCells,
+        headerFont: savedDesign?.headerFont ?? savedDesign?.fontPairing ?? demoState.settings.scheduleDesign.headerFont,
+        titleFont: savedDesign?.titleFont ?? savedDesign?.fontPairing ?? demoState.settings.scheduleDesign.titleFont,
+        bodyFont: savedDesign?.bodyFont ?? savedDesign?.fontPairing ?? demoState.settings.scheduleDesign.bodyFont,
+        showRehearsalNumbers: false,
       },
     },
   };

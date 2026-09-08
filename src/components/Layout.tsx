@@ -12,7 +12,7 @@ interface Props {
   canRedo: boolean;
   cloud: CloudStatus;
   onSignIn: (email: string, password: string) => Promise<void>;
-  onSignUp: (email: string, password: string, name: string) => Promise<void>;
+  onSignUp: (email: string, password: string) => Promise<void>;
   onPasswordResetRequest: (email: string) => Promise<void>;
   onCompletePasswordReset: (password: string) => Promise<void>;
   onSignOut: () => Promise<void>;
@@ -134,7 +134,7 @@ function AccountPanel({
   sandboxMode: boolean;
   onSandboxModeChange: (enabled: boolean) => void;
   onSignIn: (email: string, password: string) => Promise<void>;
-  onSignUp: (email: string, password: string, name: string) => Promise<void>;
+  onSignUp: (email: string, password: string) => Promise<void>;
   onPasswordResetRequest: (email: string) => Promise<void>;
   onCompletePasswordReset: (password: string) => Promise<void>;
   onSignOut: () => Promise<void>;
@@ -145,7 +145,6 @@ function AccountPanel({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
-  const [name, setName] = useState("");
 
   const busy = cloud.status === "checking" || cloud.status === "loading" || cloud.status === "saving";
   const isCloudSaved = cloud.status === "saved";
@@ -159,7 +158,7 @@ function AccountPanel({
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (mode === "signin") await onSignIn(email, password);
-    else if (mode === "signup") await onSignUp(email, password, name);
+    else if (mode === "signup") await onSignUp(email, password);
     else if (mode === "forgot") await onPasswordResetRequest(email);
     else await onCompletePasswordReset(newPassword);
   }
@@ -204,7 +203,6 @@ function AccountPanel({
             </>
           ) : (
             <>
-              {mode === "signup" && <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Director name" className="w-full rounded border border-line px-2 py-1.5 text-xs" />}
               <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" type="email" className="w-full rounded border border-line px-2 py-1.5 text-xs" />
               {mode !== "forgot" && <input value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" type="password" className="w-full rounded border border-line px-2 py-1.5 text-xs" />}
             </>

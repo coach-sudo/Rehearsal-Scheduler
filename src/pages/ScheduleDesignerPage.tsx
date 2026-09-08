@@ -83,7 +83,7 @@ function densityLabel(value: number) {
 export default function ScheduleDesignerPage() {
   const { state, setState } = useAppState();
   const [designerTab, setDesignerTab] = useState<"format" | "content" | "words" | "print">("format");
-  const [previewSelection, setPreviewSelection] = useState<{ kind: "page" | "block"; id?: string } | null>(null);
+  const [previewSelection, setPreviewSelection] = useState<{ kind: "page" | "block"; id?: string; maxTextSize?: number } | null>(null);
   const previewRef = useRef<HTMLIFrameElement>(null);
   const design = state.settings.scheduleDesign;
   const activeTemplate = scheduleTemplates.find((template) => template.id === design.template) ?? scheduleTemplates[0];
@@ -138,13 +138,15 @@ export default function ScheduleDesignerPage() {
   function bindPreviewSelection() {
     const doc = previewRef.current?.contentDocument;
     if (!doc) return;
-    const select = (selection: { kind: "page" | "block"; id?: string }, selectedElement?: HTMLElement) => {
+    const select = (selection: { kind: "page" | "block"; id?: string; maxTextSize?: number }, selectedElement?: HTMLElement) => {
       doc.querySelectorAll<HTMLElement>(".preview-selection").forEach((element) => element.classList.remove("preview-selection"));
       selectedElement?.classList.add("preview-selection");
       setPreviewSelection(selection);
     };
     const logo = doc.querySelector<HTMLElement>("[data-page-logo]");
+    const logoResizeHandle = doc.querySelector<HTMLElement>("[data-logo-resize]");
     logo?.addEventListener("pointerdown", (event) => {
+      if ((event.target as HTMLElement | null)?.closest?.("[data-logo-resize]")) return;
       const paper = logo.closest<HTMLElement>(".schedule-paper");
       if (!paper) return;
       event.preventDefault();
@@ -177,13 +179,38 @@ export default function ScheduleDesignerPage() {
       doc.addEventListener("pointermove", moveLogo);
       doc.addEventListener("pointerup", dropLogo);
     });
+    logoResizeHandle?.addEventListener("pointerdown", (event) => {
+      const logoElement = logo;
+      if (!logoElement) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const initialWidth = logoElement.getBoundingClientRect().width;
+      const startX = event.clientX;
+      const startY = event.clientY;
+      const resizeLogo = (moveEvent: PointerEvent) => {
+        const delta = Math.max(moveEvent.clientX - startX, moveEvent.clientY - startY);
+        const next = Math.max(24, Math.min(480, initialWidth + delta));
+        logoElement.style.width = `${next}px`;
+        logoElement.style.height = `${next}px`;
+      };
+      const finishResize = (finishEvent: PointerEvent) => {
+        resizeLogo(finishEvent);
+        const next = Number.parseFloat(logoElement.style.width);
+        updateDesign({ logoSize: Number.isFinite(next) ? next : design.logoSize });
+        doc.removeEventListener("pointermove", resizeLogo);
+        doc.removeEventListener("pointerup", finishResize);
+      };
+      doc.addEventListener("pointermove", resizeLogo);
+      doc.addEventListener("pointerup", finishResize);
+    });
     doc.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
       if (target?.closest?.("[data-page-logo]")) return;
       const block = target?.closest?.("[data-block-id]") as HTMLElement | null;
       if (block?.dataset.blockId) {
         event.preventDefault();
-        select({ kind: "block", id: block.dataset.blockId }, block);
+        const maxTextSize = Number(block.dataset.maxTextSize);
+        select({ kind: "block", id: block.dataset.blockId, maxTextSize: Number.isFinite(maxTextSize) ? maxTextSize : 28 }, block);
         return;
       }
       const paper = target?.closest?.(".schedule-paper") as HTMLElement | null;
@@ -208,6 +235,9 @@ export default function ScheduleDesignerPage() {
       spacing: blockCount > 10 ? "compact" : template.spacing,
       density: compactDensity,
       fontPairing: template.fontPairing,
+      headerFont: template.fontPairing,
+      titleFont: template.fontPairing,
+      bodyFont: template.fontPairing,
       customDesignName: design.customDesignName || "My schedule format",
       showActorNames: template.showActorNames,
       showCharacterNames: template.showCharacterNames,
@@ -376,7 +406,12 @@ export default function ScheduleDesignerPage() {
             <Panel title="Fast Tweaks">
               <label className="block text-sm font-medium">Density <span className="text-stone-500">{densityLabel(design.density)} ({design.density})</span><input type="range" min={10} max={100} value={design.density} onChange={(event) => updateDesign({ density: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Controls grid header height, cell padding, and the amount of breathing room around details.</span></label>
               <label className="mt-3 block text-sm font-medium">Page text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={28} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Changes the printed page. Click blank paper in the preview to select the whole page, or click one rehearsal block to adjust only that block.</span></label>
-              <label className="mt-3 block text-sm font-medium">Font<select value={design.fontPairing} onChange={(event) => updateDesign({ fontPairing: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
+              <label className="mt-3 block text-sm font-medium">Start with font family<select value={design.fontPairing} onChange={(event) => updateDesign({ fontPairing: event.target.value as FontPairing, headerFont: event.target.value as FontPairing, titleFont: event.target.value as FontPairing, bodyFont: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
+              <div className="mt-3 grid gap-2">
+                <label className="block text-sm font-medium">Header font<select value={design.headerFont ?? design.fontPairing} onChange={(event) => updateDesign({ headerFont: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
+                <label className="block text-sm font-medium">Work/title font<select value={design.titleFont ?? design.fontPairing} onChange={(event) => updateDesign({ titleFont: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
+                <label className="block text-sm font-medium">Details/body font<select value={design.bodyFont ?? design.fontPairing} onChange={(event) => updateDesign({ bodyFont: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
+              </div>
               <label className="mt-3 block text-sm font-medium">Block style<select value={design.blockStyle} onChange={(event) => updateDesign({ blockStyle: event.target.value as BlockStyle })} className="mt-1 block w-full rounded border border-line px-3 py-2">{blockStyles.map((style) => <option key={style.id} value={style.id}>{style.label}</option>)}</select></label>
               {design.template === "beatCardsByDay" && <label className="mt-3 block text-sm font-medium">Time placement<select value={design.cardTimePlacement} onChange={(event) => updateDesign({ cardTimePlacement: event.target.value as ScheduleDesignSettings["cardTimePlacement"] })} className="mt-1 block w-full rounded border border-line px-3 py-2"><option value="top">Above the work</option><option value="leftRail">Left side rail</option></select></label>}
             </Panel>
@@ -403,11 +438,12 @@ export default function ScheduleDesignerPage() {
               {previewSelection?.kind === "block" && previewSelection.id && (() => {
                 const selectedBlock = state.scheduledBlocks.find((block) => block.id === previewSelection.id);
                 if (!selectedBlock) return null;
-                const requestedSize = design.blockTextSizes?.[selectedBlock.id] ?? design.minimumTextSize;
+                const maxTextSize = Math.max(8, previewSelection.maxTextSize ?? 28);
+                const requestedSize = Math.min(design.blockTextSizes?.[selectedBlock.id] ?? design.minimumTextSize, maxTextSize);
                 return <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
                   <div className="flex items-center justify-between gap-2"><strong className="text-sm">Selected rehearsal block</strong><button onClick={() => updateBlockTextSize(selectedBlock.id)} className="text-xs font-semibold text-emerald-800 underline">Use page size</button></div>
-                  <p className="mt-1 text-xs text-emerald-900">{beatTitles(selectedBlock, state) || selectedBlock.customTitle || "Call"}. The printed cell automatically limits type before it can spill outside.</p>
-                  <label className="mt-2 block text-sm font-medium">This block&apos;s text <span className="text-stone-500">{requestedSize}px</span><input type="range" min={8} max={28} value={requestedSize} onChange={(event) => updateBlockTextSize(selectedBlock.id, Number(event.target.value))} className="mt-2 w-full" /></label>
+                  <p className="mt-1 text-xs text-emerald-900">{beatTitles(selectedBlock, state) || selectedBlock.customTitle || "Call"}. This changes only this block, within the size that remains legible inside its scheduled time.</p>
+                  <label className="mt-2 block text-sm font-medium">This block&apos;s text <span className="text-stone-500">{requestedSize}px</span><input type="range" min={8} max={maxTextSize} value={requestedSize} onInput={(event) => updateBlockTextSize(selectedBlock.id, Number(event.currentTarget.value))} onChange={(event) => updateBlockTextSize(selectedBlock.id, Number(event.target.value))} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-emerald-900">This time slot can safely hold up to {maxTextSize}px.</span></label>
                 </div>;
               })()}
             </Panel>
@@ -418,7 +454,6 @@ export default function ScheduleDesignerPage() {
             <label className="mt-3 block text-sm font-medium">Small header label<input value={design.headerLabel} onChange={(event) => updateDesign({ headerLabel: event.target.value })} className="mt-1 block w-full rounded border border-line px-3 py-2" placeholder="Weekly Rehearsal Schedule" /></label>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <label className="text-sm font-medium">Week label<input value={design.weekLabel} onChange={(event) => updateDesign({ weekLabel: event.target.value })} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
-              <label className="text-sm font-medium">Called label<input value={design.calledLabel} onChange={(event) => updateDesign({ calledLabel: event.target.value })} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
               <label className="text-sm font-medium">Time label<input value={design.timeLabel} onChange={(event) => updateDesign({ timeLabel: event.target.value })} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
               <label className="text-sm font-medium">Work label<input value={design.workLabel} onChange={(event) => updateDesign({ workLabel: event.target.value })} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
               <label className="text-sm font-medium">Room label<input value={design.roomLabel} onChange={(event) => updateDesign({ roomLabel: event.target.value })} className="mt-1 block w-full rounded border border-line px-3 py-2" /></label>
@@ -439,7 +474,6 @@ export default function ScheduleDesignerPage() {
               <Toggle label="Notes" checked={design.showNotes} onChange={(checked) => updateDesign({ showNotes: checked })} />
               <Toggle label="Icons" checked={design.showIcons} onChange={(checked) => updateDesign({ showIcons: checked })} />
               <Toggle label="Durations" checked={design.showDurations} onChange={(checked) => updateDesign({ showDurations: checked })} />
-              <Toggle label="Rehearsal numbers" checked={design.showRehearsalNumbers} onChange={(checked) => updateDesign({ showRehearsalNumbers: checked })} />
             </div>
           </details>
 
@@ -455,7 +489,7 @@ export default function ScheduleDesignerPage() {
               <button onClick={autoFitCleanly} className="mt-6 rounded border border-line bg-white px-3 py-2 text-sm font-medium">Auto-fit cleanly</button>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 rounded border border-line bg-white px-3 py-2 text-sm font-medium"><Upload size={16} /> Upload production logo<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} className="hidden" /></label>
-            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded border border-line bg-panel px-3 py-2 text-sm text-stone-700"><strong className="block">Place logo on the page</strong><span className="mt-1 block text-xs">Drag it directly in the preview. It can sit anywhere on the paper and never shifts schedule content.</span></div><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={320} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">The slider controls the printed size, without changing page spacing.</span></label></div>}
+            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded border border-line bg-panel px-3 py-2 text-sm text-stone-700"><strong className="block">Place logo on the page</strong><span className="mt-1 block text-xs">Drag the logo to any part of the paper. Drag its corner square to resize it. It never shifts schedule content.</span></div><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={480} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">The slider and corner handle control the printed size without changing page spacing.</span></label></div>}
             {design.logoDataUrl && <button onClick={() => updateDesign({ logoDataUrl: undefined })} className="mt-2 text-sm text-coral">Remove logo</button>}
             <div className="mt-3 rounded border border-line bg-panel p-3">
               <div className="mb-2 flex items-center justify-between"><strong className="text-sm">Director details</strong><span className="text-xs text-stone-500">Up to 3</span></div>
