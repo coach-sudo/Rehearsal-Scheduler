@@ -48,6 +48,11 @@ export function normalizeState(parsed: Partial<AppState>): AppState {
         titleFont: savedDesign?.titleFont ?? savedDesign?.fontPairing ?? demoState.settings.scheduleDesign.titleFont,
         bodyFont: savedDesign?.bodyFont ?? savedDesign?.fontPairing ?? demoState.settings.scheduleDesign.bodyFont,
         showRehearsalNumbers: false,
+        // Older versions deliberately allowed off-page logo coordinates. Bring
+        // saved designs back onto the printable paper so the logo is always
+        // visible and directly draggable.
+        logoX: Math.max(0, Math.min(100, savedDesign?.logoX ?? demoState.settings.scheduleDesign.logoX)),
+        logoY: Math.max(0, Math.min(100, savedDesign?.logoY ?? demoState.settings.scheduleDesign.logoY)),
       },
     },
   };

@@ -159,10 +159,10 @@ export default function ScheduleDesignerPage() {
         // Keep the drag responsive all the way to every page edge. A small
         // overscan lets the logo sit in a header or footer without a fake
         // invisible margin around the paper.
-        const minX = -paperRect.width * 0.2;
-        const minY = -paperRect.height * 0.2;
-        const maxX = paperRect.width;
-        const maxY = paperRect.height;
+        const minX = 0;
+        const minY = 0;
+        const maxX = Math.max(0, paperRect.width - logoRect.width);
+        const maxY = Math.max(0, paperRect.height - logoRect.height);
         const x = Math.max(minX, Math.min(maxX, moveEvent.clientX - paperRect.left - pointerOffsetX));
         const y = Math.max(minY, Math.min(maxY, moveEvent.clientY - paperRect.top - pointerOffsetY));
         logo.style.left = `${(x / paperRect.width) * 100}%`;
@@ -185,11 +185,15 @@ export default function ScheduleDesignerPage() {
       event.preventDefault();
       event.stopPropagation();
       const initialWidth = logoElement.getBoundingClientRect().width;
+      const paper = logoElement.closest<HTMLElement>(".schedule-paper");
+      const paperRect = paper?.getBoundingClientRect();
+      const logoRect = logoElement.getBoundingClientRect();
       const startX = event.clientX;
       const startY = event.clientY;
       const resizeLogo = (moveEvent: PointerEvent) => {
         const delta = Math.max(moveEvent.clientX - startX, moveEvent.clientY - startY);
-        const next = Math.max(24, Math.min(480, initialWidth + delta));
+        const roomToRight = paperRect ? paperRect.right - logoRect.left : 480;
+        const next = Math.max(24, Math.min(480, roomToRight, initialWidth + delta));
         logoElement.style.width = `${next}px`;
       };
       const finishResize = (finishEvent: PointerEvent) => {
@@ -403,8 +407,18 @@ export default function ScheduleDesignerPage() {
 
           <section hidden={designerTab !== "content"} className="grid gap-3 md:grid-cols-2">
             <Panel title="Fast Tweaks">
-              <label className="block text-sm font-medium">Density <span className="text-stone-500">{densityLabel(design.density)} ({design.density})</span><input type="range" min={10} max={100} value={design.density} onChange={(event) => updateDesign({ density: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Controls grid header height, cell padding, and the amount of breathing room around details.</span></label>
-              <label className="mt-3 block text-sm font-medium">Page text size <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={28} value={design.minimumTextSize} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Changes the printed page. Click blank paper in the preview to select the whole page, or click one rehearsal block to adjust only that block.</span></label>
+              <label className="block text-sm font-medium">Density <span className="text-stone-500">{densityLabel(design.density)} ({design.density})</span><input type="range" min={10} max={100} value={design.density} onInput={(event) => updateDesign({ density: Number(event.currentTarget.value) })} onChange={(event) => updateDesign({ density: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Changes header height, cell padding, and breathing room in the live page.</span></label>
+              <label className="mt-3 block text-sm font-medium">All cell text <span className="text-stone-500">{design.minimumTextSize}px</span><input type="range" min={8} max={32} value={design.minimumTextSize} onInput={(event) => updateDesign({ minimumTextSize: Number(event.currentTarget.value) })} onChange={(event) => updateDesign({ minimumTextSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">Sets the starting size for every line inside every rehearsal cell.</span></label>
+              {previewSelection?.kind === "block" && previewSelection.id && (() => {
+                const selectedBlock = state.scheduledBlocks.find((block) => block.id === previewSelection.id);
+                if (!selectedBlock) return null;
+                const requestedSize = design.blockTextSizes?.[selectedBlock.id] ?? design.minimumTextSize;
+                return <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                  <div className="flex items-center justify-between gap-2"><strong className="text-sm">Selected rehearsal cell</strong><button onClick={() => updateBlockTextSize(selectedBlock.id)} className="text-xs font-semibold text-emerald-800 underline">Use all-cell size</button></div>
+                  <p className="mt-1 text-xs text-emerald-900">{beatTitles(selectedBlock, state) || selectedBlock.customTitle || "Call"}. Time, work, room, actor names, and notes grow together.</p>
+                  <label className="mt-2 block text-sm font-medium">This cell&apos;s text <span className="text-stone-500">{requestedSize}px</span><input type="range" min={8} max={32} value={requestedSize} onInput={(event) => updateBlockTextSize(selectedBlock.id, Number(event.currentTarget.value))} onChange={(event) => updateBlockTextSize(selectedBlock.id, Number(event.target.value))} className="mt-2 w-full" /></label>
+                </div>;
+              })()}
               <label className="mt-3 block text-sm font-medium">Start with font family<select value={design.fontPairing} onChange={(event) => updateDesign({ fontPairing: event.target.value as FontPairing, headerFont: event.target.value as FontPairing, titleFont: event.target.value as FontPairing, bodyFont: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
               <div className="mt-3 grid gap-2">
                 <label className="block text-sm font-medium">Header font<select value={design.headerFont ?? design.fontPairing} onChange={(event) => updateDesign({ headerFont: event.target.value as FontPairing })} className="mt-1 block w-full rounded border border-line px-3 py-2">{Object.entries(fontPairings).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
@@ -434,17 +448,6 @@ export default function ScheduleDesignerPage() {
                 <VerticalPositionControl label="Beat / rehearsal cells" value={design.beatCellVerticalAlign} onChange={(beatCellVerticalAlign) => updateDesign({ beatCellVerticalAlign })} />
               </div>
               <p className="mt-2 text-xs text-stone-500">Each area moves independently. Time labels are positioned inside their own time interval, so top, center, and bottom visibly change the grid.</p>
-              {previewSelection?.kind === "block" && previewSelection.id && (() => {
-                const selectedBlock = state.scheduledBlocks.find((block) => block.id === previewSelection.id);
-                if (!selectedBlock) return null;
-                const maxTextSize = Math.max(8, previewSelection.maxTextSize ?? 28);
-                const requestedSize = Math.min(design.blockTextSizes?.[selectedBlock.id] ?? design.minimumTextSize, maxTextSize);
-                return <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                  <div className="flex items-center justify-between gap-2"><strong className="text-sm">Selected rehearsal block</strong><button onClick={() => updateBlockTextSize(selectedBlock.id)} className="text-xs font-semibold text-emerald-800 underline">Use page size</button></div>
-                  <p className="mt-1 text-xs text-emerald-900">{beatTitles(selectedBlock, state) || selectedBlock.customTitle || "Call"}. This changes only this block, within the size that remains legible inside its scheduled time.</p>
-                  <label className="mt-2 block text-sm font-medium">This block&apos;s text <span className="text-stone-500">{requestedSize}px</span><input type="range" min={8} max={maxTextSize} value={requestedSize} onInput={(event) => updateBlockTextSize(selectedBlock.id, Number(event.currentTarget.value))} onChange={(event) => updateBlockTextSize(selectedBlock.id, Number(event.target.value))} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-emerald-900">This time slot can safely hold up to {maxTextSize}px.</span></label>
-                </div>;
-              })()}
             </Panel>
           </section>
 
@@ -488,7 +491,7 @@ export default function ScheduleDesignerPage() {
               <button onClick={autoFitCleanly} className="mt-6 rounded border border-line bg-white px-3 py-2 text-sm font-medium">Auto-fit cleanly</button>
             </div>
             <label className="mt-3 flex cursor-pointer items-center gap-2 rounded border border-line bg-white px-3 py-2 text-sm font-medium"><Upload size={16} /> Upload production logo<input type="file" accept="image/*" onChange={(event) => uploadLogo(event.target.files?.[0])} className="hidden" /></label>
-            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded border border-line bg-panel px-3 py-2 text-sm text-stone-700"><strong className="block">Place logo on the page</strong><span className="mt-1 block text-xs">Drag the logo to any part of the paper. Drag its corner square to resize it. It never shifts schedule content.</span></div><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={480} value={design.logoSize} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">The slider and corner handle control the printed size without changing page spacing.</span></label></div>}
+            {design.logoDataUrl && <div className="mt-3 grid gap-3 md:grid-cols-2"><div className="rounded border border-line bg-panel px-3 py-2 text-sm text-stone-700"><strong className="block">Place logo on the page</strong><span className="mt-1 block text-xs">Drag the visible logo anywhere on the paper. Drag its corner square to resize it.</span><button onClick={() => updateDesign({ logoX: 78, logoY: 2 })} className="mt-2 text-xs font-semibold text-moss underline">Move to top right</button></div><label className="text-sm font-medium">Logo size <span className="text-stone-500">{design.logoSize}px</span><input type="range" min={24} max={480} value={design.logoSize} onInput={(event) => updateDesign({ logoSize: Number(event.currentTarget.value) })} onChange={(event) => updateDesign({ logoSize: Number(event.target.value) })} className="mt-2 w-full" /><span className="mt-1 block text-xs font-normal text-stone-500">The slider and corner handle control the printed size without changing page spacing.</span></label></div>}
             {design.logoDataUrl && <button onClick={() => updateDesign({ logoDataUrl: undefined })} className="mt-2 text-sm text-coral">Remove logo</button>}
             <div className="mt-3 rounded border border-line bg-panel p-3">
               <div className="mb-2 flex items-center justify-between"><strong className="text-sm">Director details</strong><span className="text-xs text-stone-500">Up to 3</span></div>

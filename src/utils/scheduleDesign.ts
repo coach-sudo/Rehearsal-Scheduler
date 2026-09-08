@@ -384,10 +384,10 @@ function renderPageLogo(design: ScheduleDesignSettings) {
   if (!design.logoDataUrl) return "";
   // The logo is a true page layer. Negative offsets are intentional: they
   // allow a director to use the very top/edge of the printable paper.
-  const x = Math.max(-20, Math.min(100, design.logoX ?? 78));
-  const y = Math.max(-20, Math.min(100, design.logoY ?? 2));
+  const x = Math.max(0, Math.min(100, design.logoX ?? 78));
+  const y = Math.max(0, Math.min(100, design.logoY ?? 2));
   const size = Math.max(24, Math.min(480, design.logoSize || 88));
-  return `<div class="logo page-logo" data-page-logo="true" style="left:${x}%;top:${y}%;width:${size}px"><img src="${design.logoDataUrl}" alt=""><span class="logo-resize-handle" data-logo-resize="true" aria-hidden="true"></span></div>`;
+  return `<div class="logo page-logo" data-page-logo="true" style="left:min(${x}%,calc(100% - ${size}px));top:min(${y}%,calc(100% - ${size}px));width:${size}px"><img src="${design.logoDataUrl}" alt=""><span class="logo-resize-handle" data-logo-resize="true" aria-hidden="true"></span></div>`;
 }
 
 function directorEntries(design: ScheduleDesignSettings) {
@@ -438,7 +438,7 @@ function renderBeatDayCard(block: ScheduledBlock, state: AppState, design: Sched
   const isGeneralCall = !block.beatIds.length && (block.blockType === "break" || block.blockType === "lunch");
   const showRoom = (design.showRoom || design.showLaneNames) && (!isGeneralCall || Boolean(block.location));
   const showActors = design.showActorNames && !isGeneralCall;
-  const textSize = safeBlockTextSize(block, design, showActors, isGeneralCall, activeLanesForBlock(block, state.scheduledBlocks).length);
+  const textSize = blockTextSize(block, design);
   return `<article data-block-id="${escapeHtml(block.id)}" data-max-text-size="${textSize}" class="beat-day-card ${design.blockStyle} time-${design.cardTimePlacement}" style="--block-color:${color};${typographyVariables(design)};${blockTypographyVariables(textSize)}">
     <div class="card-time">${escapeHtml(formatScheduleTime(block.startTime, design))} - ${escapeHtml(formatScheduleTime(block.endTime, design))}${design.showDurations ? ` | ${escapeHtml(durationLabel(block))}` : ""}</div>
     <div class="card-body"><h3>${design.showIcons ? `${escapeHtml(iconForBlock(block, state))} ` : ""}${escapeHtml(beatTitles(block, state) || "Untitled rehearsal")}</h3>
@@ -607,7 +607,7 @@ function renderProportionalGridBlock(block: ScheduledBlock, state: AppState, des
   const room = block.location || block.laneId;
   const isGeneralCall = !block.beatIds.length && (block.blockType === "break" || block.blockType === "lunch");
   const showActors = design.showActorNames && !isGeneralCall;
-  const safeTextSize = safeBlockTextSize(block, design, showActors, isGeneralCall, lanes.length);
+  const safeTextSize = blockTextSize(block, design);
   return `<article data-block-id="${escapeHtml(block.id)}" data-max-text-size="${safeTextSize}" class="grid-call-block ${design.blockStyle}" style="left:calc(${left}% + 2px);top:calc(${top}% + 2px);width:calc(${laneWidth}% - 4px);height:calc(${height}% - 4px);--block-color:${color};${blockTypographyVariables(safeTextSize)}">
     <span class="grid-call-time">${escapeHtml(formatScheduleTime(block.startTime, design))} - ${escapeHtml(formatScheduleTime(block.endTime, design))}</span>
     <strong>${escapeHtml(title)}</strong>
@@ -650,24 +650,9 @@ function verticalOffset(align: ScheduleDesignSettings["cellContentVerticalAlign"
   return 0;
 }
 
-function safeBlockTextSize(block: ScheduledBlock, design: ScheduleDesignSettings, showActors: boolean, isGeneralCall: boolean, concurrentLaneCount: number) {
+function blockTextSize(block: ScheduledBlock, design: ScheduleDesignSettings) {
   const requested = design.blockTextSizes?.[block.id] ?? design.minimumTextSize ?? 11;
-  const duration = Math.max(10, timeToMinutes(block.endTime) - timeToMinutes(block.startTime));
-  const detailLines = 2
-    + Number(design.showRoom || design.showLaneNames)
-    + Number(showActors)
-    + Number(design.showCharacterNames && !isGeneralCall && block.beatIds.length)
-    + Number(design.showNotes)
-    + Number(design.showConflicts && block.conflicts.length);
-  // A short call has a physically limited printed area. This conservative cap
-  // keeps user-selected type inside that area instead of clipping the card.
-  const capacity = Math.floor((duration * 2.5) / Math.max(2, detailLines));
-  // More actors and simultaneous lanes create more wrapped lines. Lower the
-  // cap before the content reaches the card edge rather than clipping it.
-  const actorPenalty = showActors ? Math.max(0, block.actorIds.length - 3) : 0;
-  const lanePenalty = Math.max(0, concurrentLaneCount - 1) * 2;
-  const cap = Math.max(8, Math.min(28, capacity - actorPenalty - lanePenalty));
-  return Math.max(8, Math.min(requested, cap));
+  return Math.max(8, Math.min(requested, 32));
 }
 
 function activeLanesForBlock(block: ScheduledBlock, blocks: ScheduledBlock[]) {
@@ -812,7 +797,7 @@ function typographyVariables(design: ScheduleDesignSettings) {
 
 function blockTypographyVariables(size: number) {
   const safeSize = Math.max(8, size);
-  return `--block-font-size:${safeSize}px;--block-title-size:${safeSize + 1}px;--block-time-size:${Math.max(7, safeSize - .35)}px;--block-detail-size:${Math.max(7, safeSize - 1)}px`;
+  return `--block-font-size:${safeSize}px;--block-title-size:${safeSize}px;--block-time-size:${safeSize}px;--block-detail-size:${safeSize}px`;
 }
 
 function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { heading: string; body: string }) {
