@@ -191,7 +191,6 @@ export default function ScheduleDesignerPage() {
         const delta = Math.max(moveEvent.clientX - startX, moveEvent.clientY - startY);
         const next = Math.max(24, Math.min(480, initialWidth + delta));
         logoElement.style.width = `${next}px`;
-        logoElement.style.height = `${next}px`;
       };
       const finishResize = (finishEvent: PointerEvent) => {
         resizeLogo(finishEvent);
@@ -367,9 +366,9 @@ export default function ScheduleDesignerPage() {
         </div>
       </div>
 
-      <div className="grid gap-5 2xl:grid-cols-[430px_minmax(0,1fr)]">
-        <aside className="space-y-4">
-          <section className="sticky top-[88px] z-10 rounded-xl border border-line bg-white p-2 shadow-sm">
+      <div className="grid items-start gap-5 2xl:grid-cols-[400px_minmax(0,1fr)]">
+        <aside className="space-y-4 2xl:sticky 2xl:top-24 2xl:max-h-[calc(100vh-7rem)] 2xl:overflow-y-auto 2xl:pr-2">
+          <section className="sticky top-0 z-10 rounded-xl border border-line bg-white p-2 shadow-sm">
             <div className="grid grid-cols-4 gap-1">
               {designerTabs.map((tab) => (
                 <button
@@ -512,7 +511,7 @@ export default function ScheduleDesignerPage() {
 
         </aside>
 
-        <div className="min-h-[calc(100vh-150px)] rounded-xl border border-line bg-[#dfe4dd] p-3 shadow-inner lg:p-4">
+        <div className="min-h-[calc(100vh-150px)] rounded-xl border border-line bg-[#dfe4dd] p-3 shadow-inner 2xl:sticky 2xl:top-24 lg:p-4">
           <div className="mb-2 flex items-center justify-between text-xs text-stone-600"><span>Click a rehearsal block to adjust only its text. Click open paper to adjust the whole page.</span>{previewSelection?.kind === "block" ? <span className="font-semibold text-emerald-800">Block selected</span> : previewSelection?.kind === "page" ? <span className="font-semibold text-emerald-800">Page selected</span> : null}</div>
           <iframe ref={previewRef} key={templateHtml} onLoad={bindPreviewSelection} title="Designed schedule preview" srcDoc={templateHtml} className="h-[calc(100vh-190px)] min-h-[700px] w-full rounded-lg border border-line bg-white shadow-2xl" />
         </div>

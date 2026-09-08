@@ -387,7 +387,7 @@ function renderPageLogo(design: ScheduleDesignSettings) {
   const x = Math.max(-20, Math.min(100, design.logoX ?? 78));
   const y = Math.max(-20, Math.min(100, design.logoY ?? 2));
   const size = Math.max(24, Math.min(480, design.logoSize || 88));
-  return `<div class="logo page-logo" data-page-logo="true" style="left:${x}%;top:${y}%;width:${size}px;height:${size}px"><img src="${design.logoDataUrl}" alt=""><span class="logo-resize-handle" data-logo-resize="true" aria-hidden="true"></span></div>`;
+  return `<div class="logo page-logo" data-page-logo="true" style="left:${x}%;top:${y}%;width:${size}px"><img src="${design.logoDataUrl}" alt=""><span class="logo-resize-handle" data-logo-resize="true" aria-hidden="true"></span></div>`;
 }
 
 function directorEntries(design: ScheduleDesignSettings) {
@@ -438,7 +438,8 @@ function renderBeatDayCard(block: ScheduledBlock, state: AppState, design: Sched
   const isGeneralCall = !block.beatIds.length && (block.blockType === "break" || block.blockType === "lunch");
   const showRoom = (design.showRoom || design.showLaneNames) && (!isGeneralCall || Boolean(block.location));
   const showActors = design.showActorNames && !isGeneralCall;
-  return `<article data-block-id="${escapeHtml(block.id)}" class="beat-day-card ${design.blockStyle} time-${design.cardTimePlacement}" style="--block-color:${color};${typographyVariables(design)}">
+  const textSize = safeBlockTextSize(block, design, showActors, isGeneralCall, activeLanesForBlock(block, state.scheduledBlocks).length);
+  return `<article data-block-id="${escapeHtml(block.id)}" data-max-text-size="${textSize}" class="beat-day-card ${design.blockStyle} time-${design.cardTimePlacement}" style="--block-color:${color};${typographyVariables(design)};${blockTypographyVariables(textSize)}">
     <div class="card-time">${escapeHtml(formatScheduleTime(block.startTime, design))} - ${escapeHtml(formatScheduleTime(block.endTime, design))}${design.showDurations ? ` | ${escapeHtml(durationLabel(block))}` : ""}</div>
     <div class="card-body"><h3>${design.showIcons ? `${escapeHtml(iconForBlock(block, state))} ` : ""}${escapeHtml(beatTitles(block, state) || "Untitled rehearsal")}</h3>
     ${showRoom ? `<div class="card-room">${escapeHtml(block.location || block.laneId)}</div>` : ""}
@@ -607,7 +608,7 @@ function renderProportionalGridBlock(block: ScheduledBlock, state: AppState, des
   const isGeneralCall = !block.beatIds.length && (block.blockType === "break" || block.blockType === "lunch");
   const showActors = design.showActorNames && !isGeneralCall;
   const safeTextSize = safeBlockTextSize(block, design, showActors, isGeneralCall, lanes.length);
-  return `<article data-block-id="${escapeHtml(block.id)}" data-max-text-size="${safeTextSize}" class="grid-call-block ${design.blockStyle}" style="left:calc(${left}% + 2px);top:calc(${top}% + 2px);width:calc(${laneWidth}% - 4px);height:calc(${height}% - 4px);--block-color:${color};--block-font-size:${safeTextSize}px">
+  return `<article data-block-id="${escapeHtml(block.id)}" data-max-text-size="${safeTextSize}" class="grid-call-block ${design.blockStyle}" style="left:calc(${left}% + 2px);top:calc(${top}% + 2px);width:calc(${laneWidth}% - 4px);height:calc(${height}% - 4px);--block-color:${color};${blockTypographyVariables(safeTextSize)}">
     <span class="grid-call-time">${escapeHtml(formatScheduleTime(block.startTime, design))} - ${escapeHtml(formatScheduleTime(block.endTime, design))}</span>
     <strong>${escapeHtml(title)}</strong>
     ${design.showRoom || design.showLaneNames ? `<span class="grid-call-room">${escapeHtml(room)}</span>` : ""}
@@ -809,6 +810,11 @@ function typographyVariables(design: ScheduleDesignSettings) {
   return `--time-align:${design.timeTextAlign};--work-align:${design.workTextAlign};--actor-align:${design.actorTextAlign};--time-weight:${design.boldTimes ? 850 : 500};--work-weight:${design.boldWork ? 850 : 500};--actor-weight:${design.boldActorNames ? 850 : 400};--cell-content-align:${toFlex(shared)};--day-cell-align:${toFlex(design.dayCellVerticalAlign ?? shared)};--time-cell-align:${toFlex(design.timeCellVerticalAlign ?? shared)};--beat-cell-align:${toFlex(design.beatCellVerticalAlign ?? shared)}`;
 }
 
+function blockTypographyVariables(size: number) {
+  const safeSize = Math.max(8, size);
+  return `--block-font-size:${safeSize}px;--block-title-size:${safeSize + 1}px;--block-time-size:${Math.max(7, safeSize - .35)}px;--block-detail-size:${Math.max(7, safeSize - 1)}px`;
+}
+
 function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { heading: string; body: string }) {
   const headerFont = fontPairings[design.headerFont ?? design.fontPairing]?.heading ?? fonts.heading;
   const titleFont = fontPairings[design.titleFont ?? design.fontPairing]?.heading ?? fonts.heading;
@@ -846,7 +852,7 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
     .schedule-content{flex:1 1 auto;min-height:0;height:100%;overflow:hidden;position:relative}
     .scaled-content{width:var(--content-width);height:calc(100% / var(--content-scale));min-height:0;overflow:hidden;transform:scale(var(--content-scale));transform-origin:top left}
     h1,h2,h3,.block-title,.beat-day-card h3,.grid-call-block strong{font-family:${titleFont};margin:0;overflow-wrap:anywhere}.header,.header h1,.header h2,.header .eyebrow,.header .subtitle{font-family:${headerFont}}.eyebrow{font-size:${microText}px;text-transform:uppercase;letter-spacing:.08em;opacity:.68}.subtitle{font-size:${minText}px;opacity:.82;margin-top:2px;white-space:normal;overflow-wrap:anywhere}.template-purpose{font-size:${microText}px;opacity:.72;margin-top:3px}
-    h1{font-size:${onePage ? "19px" : design.spacing === "compact" ? "20px" : design.spacing === "large" ? "28px" : "24px"};line-height:1.02}.logo{box-sizing:border-box;z-index:30;pointer-events:auto}.page-logo{position:absolute;cursor:grab;user-select:none;touch-action:none}.page-logo>img{width:100%;height:100%;object-fit:contain;display:block}.page-logo:active{cursor:grabbing}.logo-resize-handle{position:absolute;right:-5px;bottom:-5px;width:13px;height:13px;border:2px solid white;border-radius:2px;background:${design.accentColor};box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:nwse-resize;touch-action:none}.notes{margin-top:2px;font-size:${microText}px;opacity:.84;line-height:1.16}.director-contact{font-weight:750}.director-details{display:grid;gap:1px;margin-top:2px}
+    h1{font-size:${onePage ? "19px" : design.spacing === "compact" ? "20px" : design.spacing === "large" ? "28px" : "24px"};line-height:1.02}.logo{box-sizing:border-box;z-index:30;pointer-events:auto}.page-logo{position:absolute;cursor:grab;user-select:none;touch-action:none;line-height:0}.page-logo>img{width:100%;height:auto;display:block}.page-logo:active{cursor:grabbing}.logo-resize-handle{position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;border:2px solid white;border-radius:2px;background:${design.accentColor};box-shadow:0 1px 3px rgba(0,0,0,.35);cursor:nwse-resize;touch-action:none}.notes{margin-top:2px;font-size:${microText}px;opacity:.84;line-height:1.16}.director-contact{font-weight:750}.director-details{display:grid;gap:1px;margin-top:2px}
     .header{position:relative;flex:0 0 auto;border-bottom:2px solid ${design.accentColor};padding-bottom:${onePage ? "4px" : "8px"};margin-bottom:${onePage ? "5px" : "9px"};min-height:0}.header-copy{min-width:0}.header.ribbon{background:${design.accentColor};color:white;margin:-${pad} -${pad} ${onePage ? "5px" : "9px"};padding:${onePage ? "0.17in" : pad} ${pad} ${onePage ? "5px" : "10px"}}.header.marquee{border:2px double ${design.accentColor};padding:${onePage ? "5px" : "9px"};text-align:center}.header.banner{background:${design.primaryColor};color:white;border:0;padding:${onePage ? "5px" : "10px"} ${pad};margin:-${pad} -${pad} ${onePage ? "5px" : "9px"}}.header.callsheet{border:1px solid ${design.primaryColor};padding:${onePage ? "5px" : "8px"};text-transform:uppercase}.header.divider{border-bottom:3px solid ${design.accentColor}}
     .day-section{break-inside:${design.keepDaysTogether ? "avoid" : "auto"};page-break-inside:${design.keepDaysTogether ? "avoid" : "auto"};margin:0 0 14px}.day-section h2{font-size:16px;margin-bottom:7px;color:${ink}}
     .block-list{display:grid;gap:7px}.timeline{border-left:2px solid ${design.accentColor};padding-left:12px;display:grid;gap:7px}.schedule-block{break-inside:${design.avoidSplittingBlocks ? "avoid" : "auto"};border-left:7px solid var(--block-color);margin:0;padding:${blockPad};background:${dark ? "#1f2937" : "#fff"};border-radius:8px;border-top:1px solid ${dark ? "#334155" : "#e6e1d8"};border-right:1px solid ${dark ? "#334155" : "#e6e1d8"};border-bottom:1px solid ${dark ? "#334155" : "#e6e1d8"}}
@@ -876,11 +882,12 @@ function baseCss(state: AppState, design: ScheduleDesignSettings, fonts: { headi
     .weekly-call-key{display:none!important}
     .grid-day-head{align-items:var(--day-cell-align,center);justify-items:center}
     .grid-call-block{display:flex;flex-direction:column;justify-content:var(--beat-cell-align,var(--cell-content-align,flex-start));padding:${densityPad};overflow:hidden;line-height:1.1;contain:layout paint}
-    .grid-call-block strong{padding-right:0;font-size:calc(var(--block-font-size, ${Math.max(8, Math.min(11.5, minText - 1 + densityRatio * 1.2))}px) + 1px);line-height:1.05;overflow-wrap:anywhere}
+    .grid-call-block strong{padding-right:0;font-size:var(--block-title-size,${Math.max(8, Math.min(11.5, minText - 1 + densityRatio * 1.2))}px);line-height:1.05;overflow-wrap:anywhere}
     .grid-call-block span{display:block}
-    .grid-call-time{font-size:calc(var(--block-font-size, ${Math.max(8, Math.min(9.5, microText))}px) - 1px);font-weight:var(--time-weight,850);color:var(--block-color);white-space:normal;overflow-wrap:normal;text-align:var(--time-align,left)}
-    .grid-call-room{font-size:calc(var(--block-font-size, ${gridDetailSize}px) - 1px);text-align:var(--actor-align,left);font-weight:750;opacity:.76;white-space:normal;overflow-wrap:anywhere}
-    .grid-call-actors,.grid-call-detail{margin-top:${Math.round(1 + densityRatio * 2)}px;font-size:calc(var(--block-font-size, ${gridDetailSize}px) - 1px);line-height:1.08;text-align:var(--actor-align,left);overflow-wrap:anywhere}
+    .grid-call-time{font-size:var(--block-time-size,${Math.max(8, Math.min(9.5, microText))}px);font-weight:var(--time-weight,850);color:var(--block-color);white-space:normal;overflow-wrap:normal;text-align:var(--time-align,left)}
+    .grid-call-room{font-size:var(--block-detail-size,${gridDetailSize}px);text-align:var(--actor-align,left);font-weight:750;opacity:.76;white-space:normal;overflow-wrap:anywhere}
+    .grid-call-actors,.grid-call-detail{margin-top:${Math.round(1 + densityRatio * 2)}px;font-size:var(--block-detail-size,${gridDetailSize}px);line-height:1.08;text-align:var(--actor-align,left);overflow-wrap:anywhere}
+    .beat-day-card h3{font-size:var(--block-title-size,${Math.max(10, minText + 1)}px)}.beat-day-card .card-time{font-size:var(--block-time-size,${minText}px)}.beat-day-card .card-room,.beat-day-card p,.beat-day-card small,.beat-day-card em{font-size:var(--block-detail-size,${microText}px)}
     .grid-call-detail{opacity:.8}
     .grid-call-block em{display:block;margin-top:1px;font-size:${Math.max(7, microText - .8)}px;line-height:1.1;color:#b42318;font-style:normal;font-weight:800;overflow-wrap:anywhere}
   `;
